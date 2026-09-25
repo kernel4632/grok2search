@@ -19,7 +19,7 @@ import { swagger } from "@elysiajs/swagger";
 import { Clearance, NoAccountError, Pool, Searcher, getLogs, getSearchResult, log, resolveUid, type SearchConfig } from "./grok.ts";
 import { dbStats, initDb } from "./db.ts";
 import { QuotaRefresher, QuotaStore } from "./quota.ts";
-import { toJSON, toText, streamHead, streamItem, streamTail } from "./format.ts";
+import { toJSON, toText, buildAnswer, searchCallItems, streamHead, streamItem, streamTail } from "./format.ts";
 
 // ============================================================================
 // 配置：读 config.json 并补默认值（容器里由 compose 挂载）
@@ -136,6 +136,11 @@ function slice(text: string, size = 240): string[] {
 /** 根据请求体提取用户问题（见下方 extractQuery）后，这里放一些小工具 */
 const chatChunk = (id: string, delta: Record<string, unknown>, finish: string | null = null) => ({ id, object: "chat.completion.chunk", created: Math.floor(Date.now() / 1000), model: PUBLIC_MODEL, choices: [{ index: 0, delta, finish_reason: finish }] });
 
+/** 顶层 citations：全部来源链接（网页在前，帖子在后），与 grok2api 一致 */
+const sourceUrls = (data: { pages: Array<{ url: string }>; posts: Array<{ url: string }> }) => [...data.pages.map((p) => p.url), ...data.posts.map((p) => p.url)];
+/** server_side_tool_usage：web/x 搜索调用次数 */
+const toolUsage = (web: number, x: number) => ({ SERVER_SIDE_TOOL_WEB_SEARCH: web, SERVER_SIDE_TOOL_X_SEARCH: x });
+
 /**
  * 极简异步通道：搜索线程 push 增量片段，SSE 生成器 await 消费。
  * 这是"真流式"的关键——搜索结果一到就推给客户端，而不是等全部搜完再切片。
@@ -190,11 +195,25 @@ const app = new Elysia()
         const id = `chatcmpl-${crypto.randomUUID().replace(/-/g, "")}`;
         const wantsJson = body?.search_format === "json";
 
-        // ---- 非流式（或要求 JSON 输出）：等搜索完成，返回整理好的完整正文 ----
+        // ---- 非流式（或要求 JSON 输出）：等搜索完成，返回整理好的完整正文 + 引用 ----
         if (!body?.stream || wantsJson) {
           let data; try { data = await searcher.search(query, bearer(headers)); } catch (error: any) { set.status = error instanceof NoAccountError ? 503 : 502; return err(error instanceof NoAccountError ? "no_account" : "upstream_failed", error.message, "server_error"); }
-          const text = wantsJson ? JSON.stringify(toJSON(data), null, 2) : toText(data, query, snippetMax);
-          if (!body?.stream) return { id, object: "chat.completion", created: Math.floor(Date.now() / 1000), model: PUBLIC_MODEL, choices: [{ index: 0, message: { role: "assistant", content: text }, finish_reason: "stop" }], usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 }, search: toJSON(data) };
+          const json = toJSON(data);
+          const answer = buildAnswer(data, query, snippetMax);
+          const text = wantsJson ? JSON.stringify(json, null, 2) : answer.text;
+          const { web, x } = searchCallItems(data);
+          if (!body?.stream) return {
+            id, object: "chat.completion", created: Math.floor(Date.now() / 1000), model: PUBLIC_MODEL,
+            citations: sourceUrls(data),
+            server_side_tool_usage: toolUsage(web.length, x.length),
+            choices: [{
+              index: 0,
+              message: { role: "assistant", content: text, annotations: wantsJson ? [] : answer.citations.map((c) => ({ type: "url_citation", url_citation: { url: c.url, title: c.title, start_index: c.start_index, end_index: c.end_index } })) },
+              finish_reason: "stop",
+            }],
+            usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+            search: json,
+          };
           // JSON + 流式：JSON 无法增量拼接，退化为搜完后切片下发
           set.headers["content-type"] = "text/event-stream; charset=utf-8";
           return (async function* () {
@@ -237,8 +256,17 @@ const app = new Elysia()
         // ---- 非流式（或 JSON）：等搜索完成 ----
         if (!body?.stream || wantsJson) {
           let data; try { data = await searcher.search(query, bearer(headers)); } catch (error: any) { set.status = error instanceof NoAccountError ? 503 : 502; return err(error instanceof NoAccountError ? "no_account" : "upstream_failed", error.message, "server_error"); }
-          const text = wantsJson ? JSON.stringify(toJSON(data), null, 2) : toText(data, query, snippetMax);
-          if (!body?.stream) return { id: responseId, object: "response", created_at: created, status: "completed", model: PUBLIC_MODEL, output: [{ id: messageId, type: "message", role: "assistant", status: "completed", content: [{ type: "output_text", text, annotations: [] }] }], usage, search: toJSON(data) };
+          const json = toJSON(data);
+          const answer = buildAnswer(data, query, snippetMax);
+          const text = wantsJson ? JSON.stringify(json, null, 2) : answer.text;
+          const { web, x } = searchCallItems(data);
+          const citations = sourceUrls(data);
+          const annotations = wantsJson ? [] : answer.citations.map((c, i) => ({ type: "url_citation", url: c.url, title: String(i + 1), start_index: c.start_index, end_index: c.end_index }));
+          const output = [
+            ...web.filter((it) => it.action.sources.length > 0), ...x.filter((it) => it.action.sources.length > 0),
+            { id: messageId, type: "message", role: "assistant", status: "completed", content: [{ type: "output_text", text, annotations }] },
+          ];
+          if (!body?.stream) return { id: responseId, object: "response", created_at: created, status: "completed", model: PUBLIC_MODEL, output, citations, server_side_tool_usage: toolUsage(web.length, x.length), usage: { ...usage, num_sources_used: citations.length, num_server_side_tools_used: web.length + x.length }, search: json };
           set.headers["content-type"] = "text/event-stream; charset=utf-8";
           return (async function* () {
             const send = (type: string, payload: Record<string, unknown>) => sse({ event: type, data: { type, ...payload } });
@@ -253,12 +281,14 @@ const app = new Elysia()
           })();
         }
 
-        // ---- 真流式：边搜边发 ----
+        // ---- 真流式：边搜边发（正文先推；搜索结束后补 web_search_call/x_search_call 项） ----
         const channel = createChannel<string>();
+        let resolveData!: (data: any) => void;
+        const dataPromise = new Promise<any>((resolve) => (resolveData = resolve));
         searcher
           .search(query, bearer(headers), (chunk) => channel.push(chunk))
-          .then((data) => { channel.push(streamTail(data.pages.length, data.posts.length, data.elapsedMs ?? 0)); channel.close(); })
-          .catch((error: any) => { channel.push(`\n[搜索失败：${error?.message ?? error}]\n`); channel.close(); });
+          .then((data) => { channel.push(streamTail(data.pages.length, data.posts.length, data.elapsedMs ?? 0)); resolveData(data); channel.close(); })
+          .catch((error: any) => { channel.push(`\n[搜索失败：${error?.message ?? error}]\n`); resolveData(null); channel.close(); });
 
         set.headers["content-type"] = "text/event-stream; charset=utf-8";
         return (async function* () {
@@ -278,7 +308,23 @@ const app = new Elysia()
           yield send("response.output_text.done", { item_id: messageId, output_index: 0, content_index: 0, text: full });
           yield send("response.content_part.done", { item_id: messageId, output_index: 0, content_index: 0, part: { type: "output_text", text: full } });
           yield send("response.output_item.done", { output_index: 0, item: { id: messageId, type: "message", role: "assistant", status: "completed", content: [{ type: "output_text", text: full, annotations: [] }] } });
-          yield send("response.completed", { response: { id: responseId, object: "response", created_at: created, status: "completed", model: PUBLIC_MODEL, output: [], usage } });
+
+          // ---- 搜索调用项：web_search_call / x_search_call（与 grok2api 同款，排在 message 之后） ----
+          const data = await dataPromise;
+          let citations: string[] = [];
+          let serverTools = toolUsage(0, 0);
+          if (data) {
+            const { web, x } = searchCallItems(data);
+            citations = sourceUrls(data);
+            serverTools = toolUsage(web.length, x.length);
+            let outputIndex = 1;
+            for (const item of [...web, ...x].filter((it) => it.action.sources.length > 0)) {
+              yield send("response.output_item.added", { output_index: outputIndex, item });
+              yield send("response.output_item.done", { output_index: outputIndex, item });
+              outputIndex += 1;
+            }
+          }
+          yield send("response.completed", { response: { id: responseId, object: "response", created_at: created, status: "completed", model: PUBLIC_MODEL, output: [], usage }, citations, server_side_tool_usage: serverTools });
         })();
       }, { body: t.Object({ input: t.Optional(t.Any()), instructions: t.Optional(t.String()), stream: t.Optional(t.Boolean()), search_format: t.Optional(t.String()) }, { additionalProperties: true }) }),
   )

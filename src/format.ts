@@ -22,36 +22,108 @@ function clean(text: string, max: number): string {
   return value.length > max ? `${value.slice(0, max)}…` : value;
 }
 
+/** 一条引用（OpenAI url_citation 所需的字段：链接、标题、正文里的字符偏移） */
+export interface AnswerCitation {
+  url: string;
+  title: string;
+  start_index: number;
+  end_index: number;
+}
+
 /**
- * 把搜索结果整理成可读正文：
- *   开头给统计与用户问题，随后按来源逐条列出「标题 + 摘要 + 链接」，
- *   X 讨论单独成段。整体形态接近一个整理好的回答，而不是原始 JSON。
+ * 把搜索结果整理成正文 + 引用标注（与 grok2api web 模型同款）：
+ *   - 每条来源后面跟 [[N]](url) 内联引用；
+ *   - citations 记录每个引用的 url / 标题 / start_index / end_index（码点偏移，
+ *     供 Responses 的平铺 url_citation 或 Chat 的嵌套 url_citation 直接使用）。
  */
-export function toText(data: SearchData, query: string, snippetMax: number): string {
-  const lines: string[] = [`「${query}」搜索结果（网页 ${data.pages.length} 条，X 帖子 ${data.posts.length} 条）`];
+export function buildAnswer(data: SearchData, query: string, snippetMax: number): { text: string; citations: AnswerCitation[] } {
+  const parts: string[] = [];
+  const citations: AnswerCitation[] = [];
+  let offset = 0; // 码点偏移（CJK 也按 1 记，和 OpenAI 一致）
+  let n = 0;
+
+  const add = (s: string) => {
+    parts.push(s);
+    offset += [...s].length;
+  };
+  const cite = (url: string, title: string) => {
+    n += 1;
+    const marker = `[[${n}]](${url})`;
+    parts.push(marker);
+    citations.push({ url, title, start_index: offset, end_index: offset + [...marker].length });
+    offset += [...marker].length;
+  };
+
+  add(`「${query}」搜索结果（网页 ${data.pages.length} 条，X 帖子 ${data.posts.length} 条）`);
 
   if (data.pages.length > 0) {
-    lines.push("", "——— 网页 ———");
+    add("\n\n——— 网页 ———");
     data.pages.forEach((page, index) => {
-      lines.push("", `${index + 1}. ${page.title || page.url}`);
+      const title = page.title || page.url;
+      add(`\n\n${index + 1}. ${title}`);
       const snippet = clean(page.snippet, snippetMax);
-      if (snippet) lines.push(`   ${snippet}`);
-      lines.push(`   🔗 ${page.url}`);
+      if (snippet) add(`\n   ${snippet}`);
+      add("\n   🔗 ");
+      cite(page.url, title);
     });
   }
 
   if (data.posts.length > 0) {
-    lines.push("", "——— X 讨论 ———");
+    add("\n\n——— X 讨论 ———");
     data.posts.forEach((post, index) => {
       const meta = [post.createdAt && `${post.createdAt}`, post.views != null && `${post.views} 浏览`, post.likes != null && `${post.likes} 赞`].filter(Boolean).join(" · ");
-      lines.push("", `${index + 1}. @${post.handle}（${post.name}）${meta ? ` · ${meta}` : ""}`);
-      lines.push(`   ${clean(post.text, snippetMax)}`);
-      lines.push(`   🔗 ${post.url}`);
+      add(`\n\n${index + 1}. @${post.handle}（${post.name}）${meta ? ` · ${meta}` : ""}`);
+      add(`\n   ${clean(post.text, snippetMax)}`);
+      add("\n   🔗 ");
+      cite(post.url, `@${post.handle}: ${clean(post.text, 80)}`);
     });
   }
 
-  if (data.pages.length + data.posts.length === 0) lines.push("", "未获取到搜索结果。");
-  return lines.join("\n");
+  if (data.pages.length === 0 && data.posts.length === 0) add("\n\n未获取到搜索结果。");
+  return { text: parts.join(""), citations };
+}
+
+/** 文本输出（含 [[N]](url) 引用），供快照 / JSON 之前的旧调用方继续使用 */
+export function toText(data: SearchData, query: string, snippetMax: number): string {
+  return buildAnswer(data, query, snippetMax).text;
+}
+
+/** 按来源把条目分组（同一搜索词聚到一次 web/x 搜索调用里），保持出现顺序 */
+function groupSources<T extends { url: string; query?: string }>(
+  items: T[],
+  source: (item: T) => { title: string; url: string },
+): Array<{ query?: string; sources: Array<{ title: string; type: "url"; url: string }> }> {
+  const map = new Map<string, { query?: string; sources: Array<{ title: string; type: "url"; url: string }> }>();
+  const order: string[] = [];
+  for (const item of items) {
+    const key = item.query || "";
+    if (!map.has(key)) {
+      map.set(key, { query: item.query || undefined, sources: [] });
+      order.push(key);
+    }
+    map.get(key)!.sources.push({ ...source(item), type: "url" });
+  }
+  return order.map((key) => map.get(key)!);
+}
+
+/**
+ * Responses 协议的搜索调用项（grok2api web 模型同款）：
+ *   web = web_search_call（action.type="search"），x = x_search_call（无 type）。
+ */
+export function searchCallItems(data: SearchData) {
+  const web = groupSources(data.pages, (p) => ({ title: p.title || p.url, url: p.url })).map((g) => ({
+    id: `ws_${crypto.randomUUID()}`,
+    type: "web_search_call",
+    status: "completed",
+    action: { type: "search", ...(g.query ? { query: g.query } : {}), sources: g.sources },
+  }));
+  const x = groupSources(data.posts, (p) => ({ title: `@${p.handle}: ${clean(p.text, 80)}`, url: p.url })).map((g) => ({
+    id: `xs_${crypto.randomUUID()}`,
+    type: "x_search_call",
+    status: "completed",
+    action: { ...(g.query ? { query: g.query } : {}), sources: g.sources },
+  }));
+  return { web, x };
 }
 
 /** 结构化输出：字段名稳定，便于程序消费；不含账号等内部信息 */
