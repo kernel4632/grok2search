@@ -1,0 +1,811 @@
+[
+ {
+  "type": "response.chunk",
+  "event_id": "evt_fa471118931b40259f0c275a3c88483f_10",
+  "response_id": "427a6c46-a75a-4b27-8594-6a5e6ab8545e",
+  "item_id": "427a6c46-a75a-4b27-8594-6a5e6ab8545e",
+  "chunk": {
+   "ui_layout": {
+    "reasoning_ui_layout": "UNIFIED"
+   }
+  }
+ },
+ {
+  "type": "response.chunk",
+  "event_id": "evt_fa471118931b40259f0c275a3c88483f_11",
+  "response_id": "427a6c46-a75a-4b27-8594-6a5e6ab8545e",
+  "item_id": "427a6c46-a75a-4b27-8594-6a5e6ab8545e",
+  "chunk": {
+   "metadata": {
+    "step_id": 0
+   },
+   "tool_usage_card": {
+    "tool_usage_card_id": "1318e34f-1c7d-43b4-b9fb-cd3a1f4657e3",
+    "web_search": {
+     "args": {
+      "query": "北京 新闻"
+     }
+    }
+   }
+  }
+ },
+ {
+  "type": "response.chunk",
+  "event_id": "evt_fa471118931b40259f0c275a3c88483f_12",
+  "response_id": "427a6c46-a75a-4b27-8594-6a5e6ab8545e",
+  "item_id": "427a6c46-a75a-4b27-8594-6a5e6ab8545e",
+  "chunk": {
+   "metadata": {
+    "step_id": 0
+   },
+   "tool_usage_card": {
+    "tool_usage_card_id": "8808f40f-c105-4d93-8607-9462a99c42e1",
+    "web_search": {
+     "args": {
+      "query": "最新北京新闻"
+     }
+    }
+   }
+  }
+ },
+ {
+  "type": "response.chunk",
+  "event_id": "evt_fa471118931b40259f0c275a3c88483f_13",
+  "response_id": "427a6c46-a75a-4b27-8594-6a5e6ab8545e",
+  "item_id": "427a6c46-a75a-4b27-8594-6a5e6ab8545e",
+  "chunk": {
+   "metadata": {
+    "step_id": 0
+   },
+   "tool_usage_card": {
+    "tool_usage_card_id": "9e3695e6-da77-40a2-910f-519f3a6e4199",
+    "web_search": {
+     "args": {
+      "query": "Beijing news"
+     }
+    }
+   }
+  }
+ },
+ {
+  "type": "response.chunk",
+  "event_id": "evt_fa471118931b40259f0c275a3c88483f_14",
+  "response_id": "427a6c46-a75a-4b27-8594-6a5e6ab8545e",
+  "item_id": "427a6c46-a75a-4b27-8594-6a5e6ab8545e",
+  "chunk": {
+   "metadata": {
+    "step_id": 0
+   },
+   "tool_usage_card": {
+    "tool_usage_card_id": "68eb9860-3793-4ccb-ad3b-8d7970fd9f53",
+    "x_search": {
+     "args": {
+      "query": "北京 OR Beijing (新闻 OR news OR 今日 OR today) lang:zh"
+     }
+    }
+   }
+  }
+ },
+ {
+  "type": "response.chunk",
+  "event_id": "evt_fa471118931b40259f0c275a3c88483f_15",
+  "response_id": "427a6c46-a75a-4b27-8594-6a5e6ab8545e",
+  "item_id": "427a6c46-a75a-4b27-8594-6a5e6ab8545e",
+  "chunk": {
+   "metadata": {
+    "step_id": 0
+   },
+   "tool_result": {
+    "tool_call_id": "68eb9860-3793-4ccb-ad3b-8d7970fd9f53",
+    "x_post": {
+     "posts": [
+      {
+       "userhandle": "BeijingEvening",
+       "name": "Beijing Evening News",
+       "text": "张雨霏夺得亚运会女子50米蝶泳金牌\n#Chinese Olympic champion Zhang Yufei claimed the women's 50m butterfly title at the 20th Asian Games in Nagoya, Japan. #AsianGames https://t.co/CU5q2WYJxO",
+       "create_time": "2026-09-25T12:00:04Z",
+       "profile_image_url": "https://pbs.twimg.com/profile_images/1457873557338275841/Z37Sm7Ra_normal.jpg",
+       "post_id": "2103454486966776006",
+       "view_count": 9
+      },
+      {
+       "userhandle": "2haiq7649",
+       "name": "秋海",
+       "text": "中共或闪崩！当年苏联如何被军备竞赛抽干？美苏冷战终局正在北京重演！川习会演什么？读懂川普战略布局！中共政权若突解体，台湾准备好了吗？｜樊家忠｜新闻大破解【2026年9月24日】 https://t.co/lwFbhYKgoH",
+       "create_time": "2026-09-25T11:54:51Z",
+       "profile_image_url": "https://pbs.twimg.com/profile_images/1964216554511642624/z-BcXSW2_normal.png",
+       "post_id": "2103453171557478729",
+       "view_count": 8
+      },
+      {
+       "userhandle": "arnaudmercier",
+       "name": "Arnaud Mercier - #Entrepreneur #Versailles",
+       "text": "徐坤应邀来校作“人工智能赋能教育变革”专题辅导报告 - 北京交通大学新闻网 https://t.co/twhsvMWBY9",
+       "create_time": "2026-09-25T11:53:34Z",
+       "profile_image_url": "https://pbs.twimg.com/profile_images/1996619736289812480/9_uk8nyO_normal.jpg",
+       "post_id": "2103452848985923958",
+       "view_count": 10
+      }
+     ]
+    }
+   }
+  }
+ },
+ {
+  "type": "response.chunk",
+  "event_id": "evt_fa471118931b40259f0c275a3c88483f_16",
+  "response_id": "427a6c46-a75a-4b27-8594-6a5e6ab8545e",
+  "item_id": "427a6c46-a75a-4b27-8594-6a5e6ab8545e",
+  "chunk": {
+   "metadata": {
+    "step_id": 0
+   },
+   "tool_usage_card": {
+    "tool_usage_card_id": "08f8c6fd-ffa5-4cfd-bba3-2a71f8d74c0b",
+    "x_search": {
+     "args": {
+      "query": "北京 OR Beijing (新闻 OR news OR 今日 OR today) lang:en"
+     }
+    }
+   }
+  }
+ },
+ {
+  "type": "response.chunk",
+  "event_id": "evt_fa471118931b40259f0c275a3c88483f_17",
+  "response_id": "427a6c46-a75a-4b27-8594-6a5e6ab8545e",
+  "item_id": "427a6c46-a75a-4b27-8594-6a5e6ab8545e",
+  "chunk": {
+   "metadata": {
+    "step_id": 0
+   },
+   "tool_result": {
+    "tool_call_id": "08f8c6fd-ffa5-4cfd-bba3-2a71f8d74c0b",
+    "x_post": {
+     "posts": [
+      {
+       "userhandle": "taiwanplusnews",
+       "name": "TaiwanPlus News",
+       "text": "Taiwan's foreign ministry accused China of \"distorting facts\" after Beijing said Xi Jinping urged Donald Trump to \"adhere to opposing\" Taiwan independence at a closed-door meeting on Thursday. https://t.co/tzhIPwTWJA",
+       "create_time": "2026-09-25T11:52:13Z",
+       "profile_image_url": "https://pbs.twimg.com/profile_images/1706186223830843392/g5-Gi00n_normal.jpg",
+       "post_id": "2103452512397533309",
+       "favorite_count": 1,
+       "view_count": 220
+      },
+      {
+       "userhandle": "CapsulNews",
+       "name": "Capsul News",
+       "text": "Sidley's Ruchun Ji: Beijing has tightened control over which companies can IPO in Hong Kong. The Long View's read: licensing becomes \"the most attractive one on the menu.\" And if the US turns hostile? Europe is already in view. The Long View.\n\nRead it here...",
+       "create_time": "2026-09-25T11:49:47Z",
+       "profile_image_url": "https://pbs.twimg.com/profile_images/2067590660086226944/U6YndctH_normal.png",
+       "post_id": "2103451897197887669",
+       "view_count": 5
+      },
+      {
+       "userhandle": "clarkaw",
+       "name": "Andrew Clark",
+       "text": "“The president of the United States barred American reporters because he labeled them a threat to national security, while welcoming Chinese reporters who answer to the communist dictatorship in Beijing” - from a @nytimes report today",
+       "create_time": "2026-09-25T11:48:00Z",
+       "profile_image_url": "https://pbs.twimg.com/profile_images/475354302634930176/NGtwiuHl_normal.jpeg",
+       "post_id": "2103451450646937606",
+       "view_count": 28
+      },
+      {
+       "userhandle": "AFP",
+       "name": "AFP News Agency",
+       "text": "🎾 World No.1 Jannik Sinner has delayed his return to the courts when he withdrew from next week's China Open in Beijing, having been out of action since his Wimbledon title in July due to a right knee injury. https://t.co/PWDgV0KhfL",
+       "create_time": "2026-09-25T11:45:03Z",
+       "profile_image_url": "https://pbs.twimg.com/profile_images/1665744339467640833/I0K_6tIf_normal.png",
+       "post_id": "2103450708779409466",
+       "view_count": 4855
+      }
+     ]
+    }
+   }
+  }
+ },
+ {
+  "type": "response.chunk",
+  "event_id": "evt_fa471118931b40259f0c275a3c88483f_18",
+  "response_id": "427a6c46-a75a-4b27-8594-6a5e6ab8545e",
+  "item_id": "427a6c46-a75a-4b27-8594-6a5e6ab8545e",
+  "chunk": {
+   "metadata": {
+    "step_id": 0
+   },
+   "tool_result": {
+    "tool_call_id": "8808f40f-c105-4d93-8607-9462a99c42e1",
+    "web_search": {
+     "webpages": [
+      {
+       "url": "https://www.bjnews.com.cn/",
+       "title": "新京报 - 好新闻，无止境",
+       "snippet": "# 新京报 - 好新闻，无止境\n\n习近平和彭丽媛出席特朗普总统夫妇举行的欢迎国宴\n\n   \n\n成年人的中秋默契：月饼不拆，先想下家\n\n鲸算π *138*\n\n中秋假期首日，北京市属公园迎客25.13万人次\n\n北京快闻\n\n2026北京朝阳国际灯光消费季启幕，水陆双线夜游点亮双节\n\n现场 *177*\n\n山河回响·征途——长征胜利90周年特别报道\n\n专题 *136488*\n\n### 推荐\n\n张展硕在本届亚运会已斩获七金\n\n\n\n第一看点 7116 2小时前\n\n中国海警开展全面执法巡查 央视记者首登黄岩岛核心水域\n\n\n\n第一看点 5191\n\n强对流天气蓝色预警：北京等地局地将有10级以上雷暴大风\n\n\n\n第一看点 29分钟前\n\n通航换解封 美伊被曝探讨阶段性协议\n\n\n\n第一看点 49分钟前\n\n新华社：亚运会决赛失利，再次暴露出中国男乒当下过度依赖王楚钦\n\n\n\n第一看点 6370\n\n上海迪士尼道歉：视障游客入园无须报备，完全尊重并支持使用盲杖\n\n\n\n嬉游\n\n视频｜西单东南角国庆花坛，藏着浪漫小彩蛋\n\n\n\n拍者 127 3小时前\n\n亚运会｜中国选手张雨霏成功卫冕女子50米蝶泳\n\n\n\n第一看点 2小时前\n"
+      },
+      {
+       "url": "http://www.baidu.com/link?url=cBLAq2azNu0FTeVJMJaQNBaQ1mUBKohO1DczmF0jEKiqBTaEwgmPE1BqG1oQWdQcA1e-VFJpkSHrn0pJJa7Eua6gFFphLHNcJMokeGONeoG",
+       "title": "北京日报社区小板报｜新规来了！整治“幽灵外卖”",
+       "snippet": "# 北京日报社区小板报｜新规来了！整治“幽灵外卖”\n\nicon_voice_on icon_voice\n\n\n\n\n\n▶ 今日天气\n\n今天早晨山区有零星小雪，白天阴转多云，偏南风二三级，最高气温7℃；夜间多云转阴，南转北风一二级，最低气温-1℃。部分路段湿滑，出行请注意交通安全。今日气温下降，体感阴冷，外出注意添衣保暖。\n\n▶ 尾号限行\n\n2和7\n\n\n\n▶ 北京新增679个“电子警察”！抓拍违法停车、超速、闯红灯等\n\n2月25日，北京市公安局公安交通管理局网站发布《关于公布新增固定式交通技术监控设备的公告》。点击查看→ 详情>>\n\n▶ 防“幽灵外卖”，外卖平台应“实地核查”登记店铺\n\n\n\n市场监管总局对近期制定的《网络餐饮服务经营者落实食品安全主体责任监督管理规定》和《网络食品销售经营者落实食品安全主体责任监督管理规定》进行解读。为杜绝“幽灵外卖”，新规要求外卖平台应通过实地核查等方式，对外卖商家的食品经营许可证等经营资质证书进行实质性审查，至少每六个月对外卖商家登记的实际经营地址等信息进行一次核验更新。 详情>>\n\n▶ 796.52平方米违建清零！东四将新增100个停车位\n\n近日，东四街"
+      },
+      {
+       "url": "https://www.bbc.com/zhongwen/topics/cjnz1d6dd65t/trad",
+       "title": "北京 - BBC News 中文",
+       "snippet": "Published: 2026-09-18\n# 北京 - BBC News 中文\n\n# 北京\n\n\n\nHyrox失禁風波：澳洲選手道歉、主辦方承諾退款\n2026年9月18日\n\n\n\n人形機器人以外，一場中國機器革命正靜悄悄地發生\n2026年8月25日\n\n\n\n香港支聯會「煽動顛覆」案 高等法院裁定有罪\n2026年8月21日\n\n\n\n11:51\n\n視頻, 「結束一黨專政」：為何令支聯會煽動顛覆政權罪成？, 節目全長 11,51\n2026年8月21日\n\n\n\n「中國尊」撞機事件背後的三大疑點：禁區、動機、飛行員\n2026年6月28日\n\n\n\n小型飛機撞上北京最高樓「中國尊」 官方時隔近一天後證實\n2026年6月27日\n\n\n\n中國「八九」民運37週年：在傳承和記憶斷層間掙扎的「六四二代」\n2026年6月4日\n\n\n\n1:18\n\n視頻, 普京結束訪華離開北京, 節目全長 1,18\n2026年5月20日\n\n\n\n3:59:21\n\n視頻, 普京與習近平會談並出席簽約儀式, 節目全長 3,59,21\n2026年5月20日\n\n\n\n17:15\n\n視頻, 普京抵達北京展開訪華行程, 節目全長 17,15\n2026年5月1"
+      },
+      {
+       "url": "https://www.newsnow.com/ng/World/Asia/China/Beijing",
+       "title": "Beijing News | Beijing Latest News - NewsNow",
+       "snippet": "Published: 2026-09-22\n# Beijing News | Beijing Latest News - NewsNow\n\nSome features may not work as expected in this browser. For the full NewsNow\n         experience, please consider updating your browser or trying a different device.\n\nSome features may not work as expected.\n\nPlease consider updating your browser or device.\n\nAdvertisement\n\nAdvertisement\n\n# Beijing\n\nFollow\n\n\n\nChina, Taiwan and the US: Why Taiwan is a key issue in Xi Jinping-Trump talks The Hindu Business Line 7h\n\nThe Hindu Busin"
+      },
+      {
+       "url": "https://www.163.com/dy/media/beijingshangbao.html",
+       "title": "北京商报",
+       "snippet": "# 北京商报\n\n \n\n## 北京商报\n\n29.6万 内容\n\n1 关注\n\n粉丝\n\n北京商报官方网易号\n\n北京商报社隶属于中共北京市委宣传部，由北京日报报业集团主管主办\n\n北京\n\n更多信息\n\n* 全部\n\n* \n\nMeta等到“Muse时刻”\n2026-09-22 23:36\n* \n\n云栖搭台，阿里AI等爆款\n2026-09-22 23:36\n* \n\n实控人父子将套现近4亿元，奥康国际12%股权背后的新买家\n2026-09-22 23:06\n* \n\n创始人退场后的妙可蓝多\n2026-09-22 22:54\n* \n\n北京月饼市场实探：百元礼盒走俏、低糖低GI成新卖点，高端月饼价格腰斩 黄牛不加价\n2026-09-22 22:35\n* \n\n海峡保险增资10亿终落地，业绩亏损、成本高企隐忧仍存\n2026-09-22 22:24\n\n【西街观察】当AI不再稀缺之后拼什么\n2026-09-22 22:14\n\n民生商品检测过程向社会公开 北京市消协开展实验室开放活动\n2026-09-22 22:14\n* \n\n国术科技董事长袁国术：综合化、精细化的金融服务能力，是衡量银行能否与科创企业深度合作的关键\n202"
+      },
+      {
+       "url": "http://bj.people.com.cn/BIG5/82837/index4.html",
+       "title": "時政要聞--北京頻道--人民網_網上的人民日報",
+       "snippet": "# 時政要聞--北京頻道--人民網_網上的人民日報\n\n人民網 >> 北京頻道 >> 時政要聞\n\n* 北京市政府召開常務會議 研究現代化首都都市圈空間協同規劃實施有關工作等事項 *2026-02-05*\n* 北京市政府召開第四次全體會議 全力以赴實現“十五五”良好開局 *2026-02-05*\n* 北京市經濟社會高質量發展大會召開 確保一季度“開門紅” *2026-02-04*\n* 中共中央國務院關於《現代化首都都市圈空間協同規劃（2023—2035年）》的批復 *2026-02-03*\n* 北京市政府工作報告 *2026-02-02*\n* 殷勇：高標准建設懷柔科學城 支撐北京（京津冀）國際科創中心建設 *2026-02-01*\n* 京津冀3項新標准2月實施 “鋼渣鋪路”助力交通低碳建設 *2026-01-31*\n* 31項重點任務助推副中心“十五五”蝶變升級 *2026-01-31*\n* 北京持續增加“一張床”“一間房”供應 *2026-01-31*\n* 去年北京“兩區”建設取得新突破 *2026-01-31*\n\n* 北京市十六屆人大四次會議舉行閉幕會 *2026-01-29*\n* 北"
+      },
+      {
+       "url": "https://www.sohu.com/xchannel/TURBd01EQXhOalk0?pcm=202.614_18_0.0.0&scm=thor_10001.614_14-201000.0.0-1-0-0-0.0&spm=smpc.home.choice-nav.2.1781188714783NbvV2Nm_1467",
+       "title": "搜狐城事",
+       "snippet": "# 搜狐城事\n\n刷新\n\n\n返回首页\n\n意见反馈\n\n\n\n\n按最新排序\n\n\n\n北京今晚有雷阵雨，阵风七级以上，影响晚高峰，周六全天都有雷阵雨\n\n北青网 · 1小时前 · 2.5万阅读\n\n\n\n打造艺企融合空间，2026北京中海广场美学联展启幕\n\n北京日报 · 1小时前 · 2795阅读\n\n\n\n养生馆诈骗400余名老人涉案超3000万！北京通报涉老年人电诈典型案例\n\n上游新闻 · 1小时前 · 8312阅读\n\n\n\n北京警方严打街头侵财犯罪，4月以来全市扒窃警情同比下降超3成\n\n新京报 · 2小时前 · 9725阅读\n\n06:37\n\n\n\n任重是土生土长的北京人，从小就是胡同串子四处蹭饭！\n\n心动信号仪 · 1小时前 · 1.0万阅读\n\n00:23\n\n\n\n张雪打卡北京启皓大厦，在楼下草坪打滚，在街边围着机车不停拍照\n\nstar星视频 · 1小时前 · 9745阅读\n\n\n\n北京交警启动酒驾醉驾及交通违法集中整治专项行动\n\n新京报 · 2小时前 · 2.4万阅读\n\n\n\n中国不谈了，北京取消两场会谈，欧盟已无法出席，不给任何幻想\n\n挖地瓜的超级鹿鼎公 · 2小时前 · 6987阅读\n\n\n\n深圳水贝金饰克"
+      },
+      {
+       "url": "http://www.bj.xinhua.org/cj/index.htm",
+       "title": "新华网",
+       "snippet": "# 新华网\n\n \n\n\n\n## 北京频道\n\n/\n\n## 财经\n\n北京密云举办2026年优化营商环境大会 2026-02-12\n冰雪经济一线观察｜“冰雪热”撬动消费“新蓝海” 2026-02-07\n春节将至，年货市场消费升温 2026-02-07\n“共享大市场·出口中国”2026年首场活动在北京举行 2026-02-05\n消费“新”图景｜补贴超1500万台！“新国补”落地首月市场活力迸发 2026-02-04\n北京丰台轨道交通产业年收入规模突破3000亿元 2026-02-01\n北京计划投入超15亿元支持10余个高精尖产业 2026-01-26\n北京西城创新破解老城停车难题 2026-01-26\n北京经开区经济总量迈上四千亿台阶 2026-01-26\n精进无负新我——北京GDP首破5万亿元背后的“国之大者” 2026-01-26\n精进无负新我——北京GDP首破5万亿元背后的“国之大者” 2026-01-25\n微视频｜“5万亿之城”“10万亿之省”再扩容！ 2026-01-25\n2025年北京新设外资企业数量增长19.5% 2026-01-25\n北京今年经济社会发展主要预期目标发布！一图速览"
+      },
+      {
+       "url": "https://www.beijing.gov.cn/ywdt/yaowen/index_5.html",
+       "title": "北京要闻_首都之窗_北京市人民政府门户网站",
+       "snippet": "# 北京要闻_首都之窗_北京市人民政府门户网站\n\n* 阅启新春 北京年味书香浓 2026-02-22\n* 有潮流市集、非遗文化 更有科技体验 商圈“京”彩过大年 2026-02-21\n* 湾里“城管蓝”： 守护“红红火火”就是守护“万家灯火” 2026-02-21\n* 北京喜迎2026澳洲万人游首发团 2026-02-21\n* 73万游客市属公园感受生态年味儿 2026-02-21\n\n* 四十年间不断写下与时代共振烟火诗篇 喜获省级卫视春晚收视十三连冠 北京台春晚连续霸榜背后有秘诀 2026-02-21\n* 北京市气象台发布沙尘蓝色预警信号 2026-02-21\n* 年味儿更有文化味儿 博物馆之城迎四海宾朋 2026-02-20\n* 市属公园年味儿足人气旺 65万人“日间赏景、夜间游园” 2026-02-20\n* 京企人形机器人惊艳亮相春晚背后——北京人形机器人产业跑在全国前列 2026-02-20\n\n* 取得全国省级卫视春晚收视十三连冠 北京台春晚实现收视口碑双丰收 2026-02-20\n* 养老护理员春节假期提供暖心服务 “我把自己当成老人们的儿女” 2026-02-20\n* 影院"
+      },
+      {
+       "url": "https://news.google.com/stories/CAAqNggKIjBDQklTSGpvSmMzUnZjbmt0TXpZd1NoRUtEd2pmanE3dkVCRlZWaFgzRDBQc055Z0FQAQ?hl=zh-CN&gl=CN&ceid=CN%3Azh-Hans",
+       "title": "Google 新闻 - 概览",
+       "snippet": "Published: 2026-04-08\n# Google 新闻 - 概览\n\n新闻\n\nGoogle 新闻\n\n完整报道\n\n排序\n\n## 焦点新闻\n\n\n\n新京报\n\n#### 北京“十五五”规划纲要出炉，蓝图下未来五年首都的担当与抱负\n\n11 小时前\n\n\n\n\n\n新浪财经\n\n#### 新增9项指标，“十五五”的首都发展蓝图如何描绘\n\n9 小时前\n\n\n\n\n\n观察\n\n#### 北京公布“十五五”时期100项重大工程，总投资超4万亿元\n\n16 小时前\n\n## 所有相关新闻报道\n\n\n\n\n\n神州学人\n\n#### 总投资超4万亿！未来五年，北京将有这些改变生活的“大动作”\n\n10 小时前\n\n\n\n\n\n京报网\n\n#### 北京市国民经济和社会发展第十五个五年规划纲要\n\n18 小时前\n\n\n\n\n\n投资界\n\n#### 北京“十五五”规划纲要：推动更多央企在京设立创投基金\n\n11 小时前\n\n\n\n\n\nSohu\n\n#### 媒体报道｜未来五年北京将新增超万亿经济增量\n\n4 小时前\n\n\n\n\n\n北京商报\n\n#### 北京“十五五”将投百项重大工程\n\n11 小时前\n\n\n\n\n\n我的钢铁网\n\n#### 《北京市国民经济和社会发展"
+      }
+     ]
+    }
+   }
+  }
+ },
+ {
+  "type": "response.chunk",
+  "event_id": "evt_fa471118931b40259f0c275a3c88483f_19",
+  "response_id": "427a6c46-a75a-4b27-8594-6a5e6ab8545e",
+  "item_id": "427a6c46-a75a-4b27-8594-6a5e6ab8545e",
+  "chunk": {
+   "metadata": {
+    "step_id": 0
+   },
+   "tool_result": {
+    "tool_call_id": "1318e34f-1c7d-43b4-b9fb-cd3a1f4657e3",
+    "web_search": {
+     "webpages": [
+      {
+       "url": "https://globalcn.biz/news/tag/701",
+       "title": "新闻标记 北京. 新闻 中国. 中国企业门户",
+       "snippet": "# 新闻标记 北京. 新闻 中国. 中国企业门户\n\n\n\n今明两天北京高温持续\n\n从生活\n\n27 June 2024 27.06.2024\n\n1027\n\n...\n\n阅读更多\n\n\n\n北京促进受COVID-19影响的商店尽早重新开业\n\n卫生保健\n\n25 November 2022 25.11.2022\n\n2916\n\n...\n\n阅读更多\n\n\n\n尹力任北京市委书记\n\n政治\n\n14 November 2022 14.11.2022\n\n3524\n\n根据中共中央决定，蔡奇不再担任北京市委兼职书记、局员、市党委委员。 \n尹力兼任北京市委常委、主席团成员、市委书记。\n一个来源: https://russian.news.cn/20221113/e341a2969f0247c09da1577d2506e771/c.html...\n\n阅读更多\n\n\n\n北京当局将禁止未接种疫苗的居民前往拥挤的地方\n\n卫生保健\n\n6 July 2022 06.07.2022\n\n3091\n\n...\n\n阅读更多\n\n\n\n中国将把对从国外入境的公民的集中检疫减少到七天\n\n卫生保健\n\n28 June 2022 28.06.2022\n\n301"
+      },
+      {
+       "url": "https://www.163.com/dy/article/KDRG6FIF05340G59.html",
+       "title": "“这一次，我们执笔写自己！”|北京|翻译|新闻|中关村_网易订阅",
+       "snippet": "Published: 2025-11-08\n“这一次，我们执笔写自己！”|北京|翻译|新闻|中关村_网易订阅\n\n 网易首页 > 网易号 > 正文 申请入驻\n\n# “这一次，我们执笔写自己！”\n\n  0\n\n 分享至\n\n\n\n\n\n\n\n深夜灯下，有人铺开纸张\n\n\n\n东方欲晓，有人合上电脑\n\n加班赶稿，日夜奔波\n\n冲在一线，无畏逆行\n\n为真相，记者肩负 重任\n\n今天，\n\n我们把镜头对准自己\n\n铁肩担道义\n\n妙手著文章\n\n2025年11月8日\n\n是第26个记者节\n\n勇往直前；为理想，\n\n记者记录时代坚定守望\n\n记者节\n\n我们自己的节日！\n\n今天是第26个中国记者节\n\n而很多海淀融媒的一线记者们\n\n还奔赴在海淀的大街小巷\n\n用镜头记录着\n\n这片创新热土的每日变迁\n\n我们不断创新报道形式\n\n力求通过多元化的视角\n\n和丰富的表现手法\n\n让每一次报道更加生动、更具感染力\n\n从文字到影像，从平面到立体\n\n我们致力于提升\n\n每一位读者的观感体验\n\n力求将海淀的故事\n\n讲得更好、传得更远\n\n\n\n今天特邀\n\n10位海淀融媒新闻工作者\n\n于镜头前后、字里行间\n\n分享他们经历的感动与温暖\n\n传递新闻背后的故事与力量\n"
+      },
+      {
+       "url": "https://news.d1cm.com/allkeywords/85770/",
+       "title": "北京“大城市病”相关新闻信息大全_第一工程机械网",
+       "snippet": "# 北京“大城市病”相关新闻信息大全_第一工程机械网\n\n \n\n综合\n\n# # 北京“大城市病”\n\n共有 2910 条相关内容信息\n\n\n\n## 擎红三季度丨助力首都绿色基建！福田雷萨10台新能源搅拌车交付北京燕建恒远\n\n福田雷萨向北京燕建恒远交付10台新能源搅拌车，助力首都绿色基建转型。该车型具备零排放、低噪音等优势，完美适配北京商砼运输工况。福田雷萨还提供专项培训，确保车辆安全高效运营，双方将深化合作共促低碳发展。\n\n2026-09-15 18:23\n\n\n\n## 《工程机械 智能化分级》团体标准专家审查会在北京成功召开\n\n2026年9月10日，中国工程机械工业协会在北京召开《工程机械 智能化分级》团体标准专家审查会，29家行业单位参与编制。协会副会长吴培国出席会议，专家组组长祁俊主持审查，专家对标准送审稿提出修改意见并一致通过审查。该标准将明确工程机械智能化分级与要求，为行业提供技术研发和场景应用的目标导向。\n\n2026-09-15 17:56\n\n\n\n## 锚定首都绿色基建标杆｜福田雷萨行星新能源搅拌车交付北京\n\n福田雷萨向北京城建混凝土有限公司交付20余台行星新能源搅拌车，投入北京重"
+      },
+      {
+       "url": "https://www.chrm.cn/mobile/news/show.php?itemid=37363",
+       "title": "国家公共就业服务区域中心（北京）揭牌成立，具备六大服务功能_才市就业_新闻_ 人力资源经理网(CHRM)手机版",
+       "snippet": "# 国家公共就业服务区域中心（北京）揭牌成立，具备六大服务功能_才市就业_新闻_ 人力资源经理网(CHRM)手机版\n\n返回\n\n才市就业\n\n\n\n**国家公共就业服务区域中心（北京）揭牌成立，具备六大服务功能**\n\n2024-09-29 16:54 浏览: 503\n\n9月28日，国家公共就业服务区域中心（北京）揭牌成立，将实现理论研究交流、技术研发推广、用工指导服务、供求信息分析发布、打造示范项目和承办重大活动六大服务功能。\n\n在随后举办的“2024年北京市秋季大型现场招聘会暨京津冀晋蒙鲁区域协作大会”上，200余家用人单位提供就业岗位超1万个，吸引4500余名求职者现场参会，用人单位收取简历2191份，559名求职者与用人单位达成初步就业意向。\n\n\n\n9月28日，北京市秋季大型现场招聘会举办，求职者在职业指导处咨询。新京报记者 王贵彬 摄\n\n区域中心建设将实现用工指导服务、供求信息分析发布等功能\n\n据介绍，人力资源和社会保障部在北京设立国家公共就业服务区域中心，是在全国范围内布局区域性服务中心、健全就业服务体系的积极探索。目前，全国仅有北京、上海获批设立国家公共就业服务区域中心并挂牌。北"
+      },
+      {
+       "url": "http://www.tibet.cn/cn/Instant/news/202301/t20230130_7350604.html",
+       "title": "北京“软实力”逆势上扬_新闻_中国西藏网",
+       "snippet": "# 北京“软实力”逆势上扬_新闻_中国西藏网\n\n* 中国西藏网微博\n* 中国西藏网微信\n\n中国西藏网 > 即时新闻 > 新闻\n\n## 北京“软实力”逆势上扬\n\n发布时间：2023-01-30 08:47:00 来源： 北京日报\n\n从年初北京冬奥会上网络安全服务商奇安信创造“零事故”纪录，到美团平台打造连接全国920万中小微企业的零售体系；从统信国产计算机操作系统助力实现14秒开机时长，到北京亦庄变身无人驾驶之城……北京“软实力”正持续提升、引领全国。近日，市经信局对外介绍，去年1到11月，本市信息传输、软件和信息技术服务业营收同比增长9.7%，全年产业发展逆势上扬，成为稳定北京经济的重要力量。\n\n**政策组合拳优化产业发展环境**\n\n夫妻小店订单量同比增幅高达125%、北京通州出现一家月销百万元的杂货店……美团去年前三季度的多项数据在疫情下依然保持上扬曲线。“我们顺应消费升级趋势布局‘即时零售’新业态，就是通过即时物流等履约能力，拓展和连接实体商户、仓储等本地零售供给，满足消费者即时需求。”美团相关负责人介绍。\n\n疫情之下，软件企业面临的不只是冲击，还有转型升级的新机遇。本市陆续推出研"
+      },
+      {
+       "url": "https://yzs.com/zhongshitoutiao/12185.html",
+       "title": "首都师范大学教授联袂创作歌曲《北京，北京》--中诗网",
+       "snippet": "# 首都师范大学教授联袂创作歌曲《北京，北京》--中诗网\n\n## 中诗网\n\n请输入关键字词\n\n您现在的位置是： 首页 > 中诗头条\n\n# 首都师范大学教授联袂创作歌曲《北京，北京》\n\n2023-12-08 作者：于小高 | 来源： 中诗网 | 阅读： 次\n\n这是一首歌吟北京的歌曲。诗人孙晓娅用温暖的饱含诗意的语言抒发了她对北京的深情。\n\n\n\n本网讯 首都师范大学中国诗歌研究中心教授孙晓娅作词，首都师范大学音乐学院理论作曲指挥系教授张飞作曲的《北京，北京》将于元月8日晚唱响2024第十届中国诗歌春晚舞台。\n\n著名评论家吴思敬教授特为此撰写评论盛赞该作品：“这是一首歌吟北京的歌曲。诗人孙晓娅用温暖的饱含诗意的语言抒发了她对北京的深情。她不是孤立地、静止地表达对北京的爱，而是像一位行吟歌手，把浓厚的感情注入到北京最有代表性的意象——诸如胡同、鼓楼、鸟巢、故宫、长城、中轴、回音壁、金秋之中，除景观的捕捉外，还点及北京城的方言、民间艺术，以及悠久的文化历史。复沓的手法、排比句式的巧妙运用，给人以一唱三叹之感，大气磅礴、低回缭绕而又不失灵动温情。修辞技艺和词性的巧妙移用给歌词创作带来新异尝试。歌词"
+      },
+      {
+       "url": "https://www.163.com/dy/article/KRKJ33VO0550B6IS.html",
+       "title": "来了来了，大象新闻在北京“安家”了！|河南|北京市|象·北京_网易订阅",
+       "snippet": "Published: 2026-04-28\n# 来了来了，大象新闻在北京“安家”了！|河南|北京市|象·北京_网易订阅\n\n# 来了来了，大象新闻在北京“安家”了！\n\n2026-04-28 19:48:30　来源: 大象新闻  河南 举报\n\n0\n\n分享至\n\n用微信扫码二维码\n\n分享至好友和朋友圈\n\n4月28日，北京富力·双子座。\n\n大象新闻的北京“分象”《象·北京》前哨站，正式投入运营。\n\n从今天起，大象新闻在北京也有了自己的“新家”。\n\n**为什么要来北京？**\n\n北京是祖国的心脏，也是新闻的源头。\n\n国新办、外交部、发改委、国台办……所有你关心的重磅政策、权威发布、热点解读，都从这里发出来。\n\n想离权威新闻更近，就必须来北京。\n\n以前我们是出差跑，现在是常驻。大象新闻《象·北京》前哨站投入运营后，这些权威声音，我们将更快一步推送到你的手机里。\n\n\n\n**来北京都干什么？**\n\n来北京，大象新闻将干好三件事。\n\n第一件：跑新闻，抢时效。部委发布会、政策解读、热点追踪......大象新闻能跑尽跑，能快尽快。我们将把那些“文件语言”拆解成大白话，第一时间讲给你听。\n\n第二件：交朋友，聚资源"
+      },
+      {
+       "url": "https://www.163.com/dy/article/KLNFA9TJ0514R9KQ.html",
+       "title": "2月14日早读｜你不能错过的新闻都在这里|孙龙|北京|年夜饭|监管总局|古特雷斯|唐纳德·特朗普_网易订阅",
+       "snippet": "Published: 2026-02-14\n# 2月14日早读｜你不能错过的新闻都在这里|孙龙|北京|年夜饭|监管总局|古特雷斯|唐纳德·特朗普_网易订阅\n\n# 2月14日早读｜你不能错过的新闻都在这里\n\n2026-02-14 09:06:04　来源: 北青网-北京青年报 北京 举报\n\n0\n\n分享至\n\n用微信扫码二维码\n\n分享至好友和朋友圈\n\n国台办：任何分裂国家、抗拒统一的图谋都是痴心妄想\n\n国务院台办发言人陈斌华13日表示，世界上只有一个中国，台湾是中国的领土，这不是谁叫嚣几句、操弄几下就能改变的。台湾问题什么时候、以什么方式解决，完全是中国人自己的事，外部势力无权干涉。在两岸必将统一也必然统一的潮流大势面前，在十四亿多同胞维护国家主权和领土完整的决心意志面前，任何分裂国家、抗拒统一的图谋都是痴心妄想。>>详情\n\n首次将互联网医院纳入监管范围 多部门就医疗机构价格公示规定公开征求意见\n\n记者了解到，市场监管总局会同国家卫生健康委、国家医保局、国家中医药局、中央军委后勤保障部研究起草的《医疗机构价格公示规定（征求意见稿）》（以下简称《规定》），于2月13日至3月16日向社会公开征求意"
+      },
+      {
+       "url": "https://read.douban.com/ebook/1134557/",
+       "title": "北京，北京 - 徐江宁 | 豆瓣阅读",
+       "snippet": "# 北京，北京 - 徐江宁 | 豆瓣阅读\n\n\n\n# 北京，北京\n\n作者 徐江宁\n\n类别 文艺小说\n\n字数 约 15,000 字\n\n上架时间 2013年08月\n\n开通会员，可免费在线阅读本书\n，首月特惠 去开通\n\n￥0.99\n\n### 作品简介\n\n作品收录了三篇短篇小说：《北京，北京》《南门外的秦腔艺人》《我是流浪狗小白》。\n\n《北京，北京》以作者真实故事改写，叙述几年来北漂之艰辛。\n\n《南门外的秦腔艺人》讲诉一对学秦腔的师兄妹凄美的爱情故事。\n\n《我是流浪狗小白》以流浪狗为第一人称，写一只流浪狗从被丢弃到被城市救助站收养的故事。\n\n七夕情人节那天，后海的酒吧非常热闹，在酒吧喝了些酒后，我独自一人在沿着后海酒吧街的那条路走着。我看到一个残疾流浪艺人在卖唱，我给了他五元钱，征得他的同意，我用他的麦克和音箱，他弹吉他伴奏，我唱了一首《北京，北京》……\n\n徐江宁，专栏作者，出版人。目前就职于北京一家出版单位，任策划编辑。\n\n有作品《我的少年游》《虚妄之刀》，短篇作品见《青年文摘》《意林》《美文》等期刊。\n\n策划出版《我的十六年海外生涯》《中国式饭局口才术》《初恋那些事儿》《暗术》《钱说玄奘西游"
+      },
+      {
+       "url": "https://tingfm.com/region/bj?lang=zh_CN",
+       "title": "北京 - 电台在线收听 - TingFM",
+       "snippet": "# 北京 - 电台在线收听 - TingFM\n\n# 地域: 北京\n\n类型\n\n\n\n### 北京新闻广播\n\n1.90K\n\n\n\n### 北京音乐广播\n\n1.61K\n\n\n\n### 北京文艺广播\n\n1.44K\n\n\n\n### 北京交通广播\n\n1.31K\n\n\n\n### 北京经典调频\n\n575\n\n\n\n### 北京城市广播\n\n490\n\n\n\n### 大兴人民广播电台\n\n486\n\n\n\n### 北京体育广播\n\n372\n\n\n\n### 央视 CCTV 5 音频\n\n272\n\n\n\n### 京津冀之声\n\n212\n\n\n\n### 北京外语广播\n\n207\n\n\n\n### 北京青年广播\n\n138\n\n\n\n### 顺义人民广播电台\n\n105\n\n\n\n### 房山人民广播电台\n\n101"
+      }
+     ]
+    }
+   }
+  }
+ },
+ {
+  "type": "response.chunk",
+  "event_id": "evt_fa471118931b40259f0c275a3c88483f_20",
+  "response_id": "427a6c46-a75a-4b27-8594-6a5e6ab8545e",
+  "item_id": "427a6c46-a75a-4b27-8594-6a5e6ab8545e",
+  "chunk": {
+   "metadata": {
+    "step_id": 1
+   },
+   "tool_usage_card": {
+    "tool_usage_card_id": "817e178f-f286-4aff-bbb6-856d3f06133b",
+    "web_search": {
+     "args": {
+      "query": "北京 今日新闻"
+     }
+    }
+   }
+  }
+ },
+ {
+  "type": "response.chunk",
+  "event_id": "evt_fa471118931b40259f0c275a3c88483f_21",
+  "response_id": "427a6c46-a75a-4b27-8594-6a5e6ab8545e",
+  "item_id": "427a6c46-a75a-4b27-8594-6a5e6ab8545e",
+  "chunk": {
+   "metadata": {
+    "step_id": 1
+   },
+   "tool_usage_card": {
+    "tool_usage_card_id": "dbb21945-2bae-41a3-9fe2-6ec6b1551d08",
+    "web_search": {
+     "args": {
+      "query": "北京今日热点"
+     }
+    }
+   }
+  }
+ },
+ {
+  "type": "response.chunk",
+  "event_id": "evt_fa471118931b40259f0c275a3c88483f_22",
+  "response_id": "427a6c46-a75a-4b27-8594-6a5e6ab8545e",
+  "item_id": "427a6c46-a75a-4b27-8594-6a5e6ab8545e",
+  "chunk": {
+   "metadata": {
+    "step_id": 1
+   },
+   "tool_usage_card": {
+    "tool_usage_card_id": "3360a38f-fc7e-43bd-9774-2c6f749b27ee",
+    "web_search": {
+     "args": {
+      "query": "北京最新新闻 9月25日"
+     }
+    }
+   }
+  }
+ },
+ {
+  "type": "response.chunk",
+  "event_id": "evt_fa471118931b40259f0c275a3c88483f_23",
+  "response_id": "427a6c46-a75a-4b27-8594-6a5e6ab8545e",
+  "item_id": "427a6c46-a75a-4b27-8594-6a5e6ab8545e",
+  "chunk": {
+   "metadata": {
+    "step_id": 1
+   },
+   "tool_usage_card": {
+    "tool_usage_card_id": "39ae42d9-ca24-4c0a-beef-7553d4972950",
+    "web_search": {
+     "args": {
+      "query": "Beijing news today"
+     }
+    }
+   }
+  }
+ },
+ {
+  "type": "response.chunk",
+  "event_id": "evt_fa471118931b40259f0c275a3c88483f_24",
+  "response_id": "427a6c46-a75a-4b27-8594-6a5e6ab8545e",
+  "item_id": "427a6c46-a75a-4b27-8594-6a5e6ab8545e",
+  "chunk": {
+   "metadata": {
+    "step_id": 1
+   },
+   "tool_usage_card": {
+    "tool_usage_card_id": "5f7b85d9-39bf-493e-a163-c3b041fb5141",
+    "x_search": {
+     "args": {
+      "query": "北京 (今日 OR 今天) (新闻 OR 热点 OR 新闻) lang:zh"
+     }
+    }
+   }
+  }
+ },
+ {
+  "type": "response.chunk",
+  "event_id": "evt_fa471118931b40259f0c275a3c88483f_25",
+  "response_id": "427a6c46-a75a-4b27-8594-6a5e6ab8545e",
+  "item_id": "427a6c46-a75a-4b27-8594-6a5e6ab8545e",
+  "chunk": {
+   "metadata": {
+    "step_id": 1
+   },
+   "tool_result": {
+    "tool_call_id": "5f7b85d9-39bf-493e-a163-c3b041fb5141",
+    "x_post": {
+     "posts": [
+      {
+       "userhandle": "Andy_NFSC",
+       "name": "Anytime",
+       "text": "0923 习朝末世 热点追踪\n\n*北京时间9月23日下午，习近平乘专机已离开北京，陪同人员包括夫人彭丽媛、蔡奇、王毅等。官方报道里没有提到企业家或商界代表随行，预计美东时间今天下午3:22左右抵达华盛顿。\n*9月22日 任正非在深圳会见东风汽车总经理冯长军，还有照片。任正非露面报平安 https://t.co/cGfpI7MJPy",
+       "create_time": "2026-09-25T11:46:10Z",
+       "profile_image_url": "https://pbs.twimg.com/profile_images/2069414070470524928/xuGvJi-X_normal.jpg",
+       "post_id": "2103450989936402627",
+       "view_count": 1
+      },
+      {
+       "userhandle": "Andy_NFSC",
+       "name": "Anytime",
+       "text": "0923 习朝末世 热点追踪\n\n*北京时间9月23日下午，习近平乘专机已离开北京，陪同人员包括夫人彭丽媛、蔡奇、王毅等。官方报道里没有提到企业家或商界代表随行，预计美东时间今天下午3:22左右抵达华盛顿。\n*9月22日 任正非在深圳会见东风汽车总经理冯长军，还有照片。任正非露面报平安...... https://t.co/aGfrRGkYnR",
+       "create_time": "2026-09-24T11:40:15Z",
+       "profile_image_url": "https://pbs.twimg.com/profile_images/2069414070470524928/xuGvJi-X_normal.jpg",
+       "post_id": "2103087109544558634",
+       "view_count": 8
+      },
+      {
+       "userhandle": "rainbowgung",
+       "name": "彩虹 Rainbow",
+       "text": "0923 习朝末世 热点追踪\n\n*北京时间9月23日下午，习近平乘专机已离开北京，陪同人员包括夫人彭丽媛、蔡奇、王毅等。官方报道里没有提到企业家或商界代表随行，预计美东时间今天下午3:22左右抵达华盛顿。\n*9月22日 任正非在深圳会见东风汽车总经理冯长军，还有照片。任正非露面报平安， https://t.co/BtXAE3t10n",
+       "create_time": "2026-09-24T03:32:47Z",
+       "profile_image_url": "https://pbs.twimg.com/profile_images/1875940212557107200/HZXpdAxV_normal.jpg",
+       "post_id": "2102964437896339644",
+       "favorite_count": 2,
+       "view_count": 1549
+      },
+      {
+       "userhandle": "redleaffarm2026",
+       "name": "红叶TV",
+       "text": "0923 习朝末世 热点追踪\n\n*北京时间9月23日下午，习近平乘专机已离开北京，陪同人员包括夫人彭丽媛、蔡奇、王毅等。官方报道里没有提到企业家或商界代表随行，预计美东时间今天下午3:22左右抵达华盛顿。\n#川习会 #任正非露面 #村镇银行缩水 #行长自扇800 #省长书记换人 https://t.co/MeWiaQTpWb",
+       "create_time": "2026-09-24T02:46:19Z",
+       "profile_image_url": "https://pbs.twimg.com/profile_images/2088782897318883328/V3VOXN-__normal.jpg",
+       "post_id": "2102952740771217836",
+       "favorite_count": 3,
+       "view_count": 34
+      }
+     ]
+    }
+   }
+  }
+ },
+ {
+  "type": "response.chunk",
+  "event_id": "evt_fa471118931b40259f0c275a3c88483f_26",
+  "response_id": "427a6c46-a75a-4b27-8594-6a5e6ab8545e",
+  "item_id": "427a6c46-a75a-4b27-8594-6a5e6ab8545e",
+  "chunk": {
+   "metadata": {
+    "step_id": 1
+   },
+   "tool_result": {
+    "tool_call_id": "3360a38f-fc7e-43bd-9774-2c6f749b27ee",
+    "web_search": {
+     "webpages": [
+      {
+       "url": "https://m.ah.huatu.com/2025/0925/3120957.html",
+       "title": "2025时政热点:国内外时事政治汇总（9月25日）_华图教育",
+       "snippet": "2025时政热点:国内外时事政治汇总（9月25日）_华图教育\n\n安徽公务员时政热点\n\n\n\n2025时政热点:国内外时事政治汇总（9月25日）\n\n网络 | 2025-09-25 08:45\n\n 收藏\n\n 一、国内资讯\n\n 1、近日，国家金融监督管理总局党委书记、局长李云泽会见美国桥水投资公司创始人瑞·达利欧一行。双方就全球经济金融形势、全球债务问题以及中国金融业发展前景等议题进行交流。\n\n 2、加快发展服务贸易，是扩大高水平对外开放、培育外贸发展新动能的重要举措。24日，商务部会同中央网信办、财政部等8部门印发了《关于促进服务出口的若干政策措施》，包含13项具体措施，为服务出口提供全面政策支持。\n\n 3、国务院新闻办公室24日上午举行“高质量完成‘十四五’规划”系列主题新闻发布会，介绍“十四五”时期应急管理改革发展成就。中国地震局局长王昆介绍，我国已建成全球最大规模地震预警系统，秒级预警覆盖重点危险区90%以上，分钟级烈度速报为抢险救援决策提供有力支撑。\n\n 4、9月24日，国家防总副总指挥、应急管理部部长王祥喜在国家应急指挥总部指挥大厅主持国家防总防汛防台风专题视频会商调度。会商指出，"
+      },
+      {
+       "url": "https://ah.huatu.com/2023/0926/2724355.html",
+       "title": "2023时政热点:国内外时事政治汇总（9月25日）_人民网-安徽人事考试网-安徽华图",
+       "snippet": "# 2023时政热点:国内外时事政治汇总（9月25日）_人民网-安徽人事考试网-安徽华图\n\n安徽华图 | V会员注册 |\n\n* **微博**\n\n微博 **华图教育**\n认证官方微博 关注\n* **华图在线APP**\n**华图在线**\n官方APP\n下载\n\n* **网站地图**\n\n当前位置： 安徽人事考试网 > 备考资料 > 时政热点 >\n\n阅读模式\n\n# 2023时政热点:国内外时事政治汇总（9月25日）\n\n2023-09-25 08:43 来源：人民网\n\n**安徽人事考试网** 同步人民网发布时政热点：2023时政热点:国内外时事政治汇总（9月25日）。更多关于每日时政热点,2023时政热点,9月时政热点汇总的相关资讯，请关注 华图考试资讯号(htgwyks) 。\n\n**一、 国内资讯**\n\n① 中国宏观经济论坛（CMF）9月23日举行CMF宏观经济热点问题研讨会，发布“美国对华的‘去风险化’——中国应主张‘去冷战风险’”专题报告。 **报告指出，“脱钩”和“去风险”都是美国为争夺国际秩序主导权的战略竞争工具。“脱钩”转换为“去风险”但并未体现出实质差异，标志着“脱钩论”失败。** 美"
+      },
+      {
+       "url": "http://fj.huatu.com/2024/0925/2358948.html",
+       "title": "2024时政热点:国内外时事政治汇总（9月25日）_公务员考试网_华图教育",
+       "snippet": "# 2024时政热点:国内外时事政治汇总（9月25日）_公务员考试网_华图教育\n\n* **网站导航**\n\n**全部考试**\n国家公务员 | 事业单位 | 教师考试 | 三支一扶 | 公安招警 | 军人考试\n福建公务员 | 教师资格 | 医疗卫生 | 选调生 | 公选/遴选 | 学历教育\n军队文职 | 金融银行 | 农信社 | 国企招聘 | 华图考研 | 近期招考 **备考助手**\n行测备考 | 申论备考 | 面试备考 | 高分技巧 | 申论热点 | 公务员培训 新手入门 | 招考信息 | 备考资料 | 华图在线 | 图书材料 | 考试题库 面授课程 | 即时沟通 | 快递查询 | 名师荟萃 | 联系我们 **各地市站点**\n\n* **选课报班**\n\n**福建公务员课程**\n\n**国家公务员课程**\n\n**福建事业单位课程**\n\n**福建银行考试课程**\n\n**福建医疗卫生课程**\n\n**福建选调生课程**\n\n**教师招聘课程**\n\n**教师资格课程**\n\n**大学生村官课程**\n\n**国家电网课程**\n\n**福建烟草课程**\n\n**福建农信社课程**\n\n**福建公选遴选课程**\n\n**"
+      },
+      {
+       "url": "https://www.sina.cn/news/detail/5083135106876656.html",
+       "title": "#南京地铁建设进度[超话]#  9月25日，在南京地铁9号线项目全体人员共同努力之下，绿博园站提前5日完成任务节点目标，扬子江大道绿博园路段东侧辅路处顺利恢复交通。 ​_新浪新闻",
+       "snippet": "Published: 2024-09-27\n# #南京地铁建设进度[超话]#  9月25日，在南京地铁9号线项目全体人员共同努力之下，绿博园站提前5日完成任务节点目标，扬子江大道绿博园路段东侧辅路处顺利恢复交通。 ​_新浪新闻\n\n\n\n新浪网·\n\n#南京地铁建设进度[超话]#  \n9月25日，在南京地铁9号线项目全体人员共同努力之下，绿博园站提前5日完成任务节点目标，扬子江大道绿博园路段东侧辅路处顺利恢复交通。 ​\n\n\n\n发布于 美国"
+      },
+      {
+       "url": "https://www.163.com/dy/article/KA9II1VR0534QBVQ.html",
+       "title": "今日早报每日热点15条新闻简报每天一分钟知晓天下事 9月25日|广东|王天一|唐纳德·特朗普_网易订阅",
+       "snippet": "Published: 2025-09-24\n# 今日早报每日热点15条新闻简报每天一分钟知晓天下事 9月25日|广东|王天一|唐纳德·特朗普_网易订阅\n\n# 今日早报每日热点15条新闻简报每天一分钟知晓天下事 9月25日\n\n2025-09-25 06:41:39　来源: 每天一分钟知晓天下事  河北 举报\n\n0\n\n分享至\n\n用微信扫码二维码\n\n分享至好友和朋友圈\n\n365资讯简报，每天精选15条热点资讯，每天一分钟，知晓天下事！\n2025年9月25日 星期四 农历八月初四\n1.八部门发文推动数字消费：增加人工智能终端产品供给、推动智慧物流建设。\n2.汽车门把手国标征求意见稿发布：禁止全隐藏式、必须配备机械冗余开门装置。\n3.神舟二十号航天员乘组将于近日择机实施第四次出舱活动。\n4.2026年全国硕士研究生招生初试时间为2025年12月20日至21日。\n5.发改委紧急安排2亿元支持广东省台风灾害灾后应急恢复。\n6.广东多地陆续解除“五停”措施，铁路列车逐步恢复开行。\n7.台风“桦加沙”已致台湾17死32伤，仍有17人失联，香港已有101人受伤。\n8.北京非机动车管理条例修订：拟规定外卖电"
+      }
+     ]
+    }
+   }
+  }
+ },
+ {
+  "type": "response.chunk",
+  "event_id": "evt_fa471118931b40259f0c275a3c88483f_27",
+  "response_id": "427a6c46-a75a-4b27-8594-6a5e6ab8545e",
+  "item_id": "427a6c46-a75a-4b27-8594-6a5e6ab8545e",
+  "chunk": {
+   "metadata": {
+    "step_id": 1
+   },
+   "tool_result": {
+    "tool_call_id": "39ae42d9-ca24-4c0a-beef-7553d4972950",
+    "web_search": {
+     "webpages": [
+      {
+       "url": "https://www.newsnow.com/ng/World/Asia/China/Beijing",
+       "title": "Beijing News | Beijing Latest News - NewsNow",
+       "snippet": "Published: 2026-09-22\n# Beijing News | Beijing Latest News - NewsNow\n\nSome features may not work as expected in this browser. For the full NewsNow\n         experience, please consider updating your browser or trying a different device.\n\nSome features may not work as expected.\n\nPlease consider updating your browser or device.\n\nAdvertisement\n\nAdvertisement\n\n# Beijing\n\nFollow\n\n\n\nChina, Taiwan and the US: Why Taiwan is a key issue in Xi Jinping-Trump talks The Hindu Business Line 7h\n\nThe Hindu Busin"
+      },
+      {
+       "url": "https://www.bjd.com.cn/app/rdjh/redian/",
+       "title": "京报网",
+       "snippet": "# 京报网\n\n热点\n\n月影朦胧！十五的月亮静静挂在天空 2026-09-25 18:57\n\n中秋假期第一天，全社会跨区域人员流动量超2.43亿人次 2026-09-25 18:46\n\n中央气象台9月25日18时发布强对流天气蓝色预警 2026-09-25 18:39\n\n“坐着高铁学三国”，中国铁道博物馆科普课堂全新上线 2026-09-25 18:06\n\n亚运参赛历史最好成绩！中国游泳队斩获30金13银11铜 2026-09-25 17:57\n\n中国赛季“低开”背后：郑钦文的纠结与坚定 2026-09-25 17:21\n\n北京今天傍晚至夜间西部北部有分散性阵雨转多云，最低气温18℃ 2026-09-25 17:07\n\n第七金！张展硕男子400米自由泳摘金 2026-09-25 17:02\n\n今年中秋有啥“不一样”？专家为你厘清“赤马中秋” 2026-09-25 17:00\n\n视频丨他们站立的地方是中国，记录黄岩岛万山舰执法员的中秋 2026-09-25 16:57\n\n中国女篮不敌韩国队无缘亚运会决赛 2026-09-25 16:56\n\n9月25日中秋节，全国铁路预计发送旅客2234万人"
+      },
+      {
+       "url": "http://en.sasac.gov.cn/sasactopnews.html",
+       "title": "Top News",
+       "snippet": "Published: 2026-09-24\n# Top News\n\nXi Says China, U.S. Should be Partners, not Rivals\n\nSeptember 24, 2026\nChina and the United States should be partners, not rivals, Chinese President Xi Jinping said on Wednesday in a written speech upon his arrival in the United States for a state visit.\n\nXi Lands in U.S. for State Visit, Greeted by Trump at Airport\n\nSeptember 24, 2026\nChinese President Xi Jinping arrived at Joint Base Andrews on Wednesday afternoon for a state visit to the United States at the "
+      },
+      {
+       "url": "https://russian.beijing.gov.cn/latest/news/",
+       "title": "Новости",
+       "snippet": "# Новости\n\nБесплатный шаттл прямо до места! В городской субцентр Пекина приезжает легендарный британский спектакль –\n30-05-2026\nПекинский фестиваль тайской культуры пройдет в парке Чаоян\n29-05-2026\nВ пекинском районе Чаоян открыто «Демонстрационное окно для международных услуг социального страхования»\n29-05-2026\nМеры по введению негативного списка для трансграничной передачи данных принесут пользу предприятиям всего Пекина\n29-05-2026\nПекин становится центром концентрации и развития публичных ком"
+      },
+      {
+       "url": "https://indianexpress.com/about/beijing/",
+       "title": "Latest News on Beijing: Get Beijing News Updates along with Photos, Videos and Latest News Headlines | The Indian Express",
+       "snippet": "# Latest News on Beijing: Get Beijing News Updates along with Photos, Videos and Latest News Headlines | The Indian Express\n\nskip to content\n\n*Sections*\n\n* India\n* International\n\nWeather\n\n\n\nJournalism of Courage\n\n# Beijing\n\n## BEIJING NEWS\n\n\n\n### China’s Wars by Vijay Gokhale: Decoding Beijing’s military strategy and ‘fight and talk’ approach\n\nAugust 09, 2026 8:46 am\n\nIn his new book, former Foreign Secretary Vijay Gokhale examines four conflicts to understand China’s use of military coercion, d"
+      }
+     ]
+    }
+   }
+  }
+ },
+ {
+  "type": "response.chunk",
+  "event_id": "evt_fa471118931b40259f0c275a3c88483f_28",
+  "response_id": "427a6c46-a75a-4b27-8594-6a5e6ab8545e",
+  "item_id": "427a6c46-a75a-4b27-8594-6a5e6ab8545e",
+  "chunk": {
+   "metadata": {
+    "step_id": 1
+   },
+   "tool_result": {
+    "tool_call_id": "dbb21945-2bae-41a3-9fe2-6ec6b1551d08",
+    "web_search": {
+     "webpages": [
+      {
+       "url": "https://news.qq.com/d/bj",
+       "title": "腾讯网-北京",
+       "snippet": "# 腾讯网-北京\n\n搜索\n\n游戏\n\n网页设置\n\n安装电脑版\n\n内容更精彩\n\n\n\n专题\n\n梨园片区三条道路招标！总投资近8000万，看看有没有你家门口~\n\n-11小时前\n\n673\n\n\n\n北京三百余桥系新增近八千车位，四环多个桥区年内开建充电桩\n\n新京报 1小时前\n\n1\n\n1\n\n3\n\n\n\n专题\n\n北京中考百问百答②\n\n2小时前\n\n216\n\n\n\n北京今天白天晴，最高气温36℃，今日入伏，请注意防暑防晒\n\n北京日报客户端 -10小时前\n\n2\n\n\n\n投资66亿！北京CBD创想大厦，中建一局中标！\n\n房产干货铺 9小时前\n\n9\n\n8\n\n34\n\n\n\n代驾转单后出事故，死者家属索赔200余万元，责任谁来担？\n\n红星新闻 2小时前\n\n4\n\n3\n\n\n\n北京胸科医院院长李亮：肺癌诊疗将迎四大方向\n\n新京报 昨天\n\n2\n\n105\n\n114\n\n\n\n1万 | 03:25\n\n天坛“黑拍”被查处！央视曝景区“黑拍”乱象\n\n央视网快看 5小时前\n\n3\n\n12\n\n\n\n北京协和医院开展日间结直肠癌根治术\n\n北京协和医院 昨天\n\n8\n\n178\n\n172\n\n\n\n1640 | 02:36\n\n人落魄时千万不要靠朋友，北京西城大爷实"
+      },
+      {
+       "url": "https://www.163.com/dy/media/T1473322582598.html",
+       "title": "BRTV新闻",
+       "snippet": "# BRTV新闻\n\n \n\n## BRTV新闻\n\n6.1万 内容\n\n1 关注\n\n粉丝\n\nBTV新闻官方网易号\n\n北京广播电视台新闻频道\n\n北京\n\n更多信息\n\n* 全部\n* 图文\n* 视频\n\n* \n\n天安门广场“祝福祖国”巨型花篮主体合龙！\n2026-09-22 10:11\n* \n\n飞船6立方米到120立方米！杨利伟：空气炸锅都带上天了\n2026-09-22 08:44\n* \n\n夯爆了！中国车手，年度总冠军\n2026-09-22 00:11\n* \n\n笑不活了！地坛书市里的“精神食粮”“思想包袱”别太有梗，一圈下来记者发现——\n2026-09-21 23:40\n* \n\n“把配料表中的白砂糖还给我们”冲上热搜，医生回应\n2026-09-21 22:47\n* \n\n“明星单独约见面？”七旬老人来京“赴约”， 落地后傻眼了\n2026-09-21 22:37\n* \n\n小伙第一次登上长城，激动高呼“妈妈我做到了”！随即唱起强军战歌，网友称隔着屏幕都浑身充满力量\n2026-09-21 21:53\n* \n\n妈妈，请不要忘记我……家里的老人出现这几个迹象，可能是得了阿尔兹海默症！快自查\n2026-09-21 "
+      },
+      {
+       "url": "https://www.163.com/dy/media/beijingshangbao.html",
+       "title": "北京商报",
+       "snippet": "# 北京商报\n\n \n\n## 北京商报\n\n29.6万 内容\n\n1 关注\n\n粉丝\n\n北京商报官方网易号\n\n北京商报社隶属于中共北京市委宣传部，由北京日报报业集团主管主办\n\n北京\n\n更多信息\n\n* 全部\n\n* \n\nMeta等到“Muse时刻”\n2026-09-22 23:36\n* \n\n云栖搭台，阿里AI等爆款\n2026-09-22 23:36\n* \n\n实控人父子将套现近4亿元，奥康国际12%股权背后的新买家\n2026-09-22 23:06\n* \n\n创始人退场后的妙可蓝多\n2026-09-22 22:54\n* \n\n北京月饼市场实探：百元礼盒走俏、低糖低GI成新卖点，高端月饼价格腰斩 黄牛不加价\n2026-09-22 22:35\n* \n\n海峡保险增资10亿终落地，业绩亏损、成本高企隐忧仍存\n2026-09-22 22:24\n\n【西街观察】当AI不再稀缺之后拼什么\n2026-09-22 22:14\n\n民生商品检测过程向社会公开 北京市消协开展实验室开放活动\n2026-09-22 22:14\n* \n\n国术科技董事长袁国术：综合化、精细化的金融服务能力，是衡量银行能否与科创企业深度合作的关键\n202"
+      },
+      {
+       "url": "https://www.bbc.com/zhongwen/topics/cjnz1d6dd65t/trad",
+       "title": "北京 - BBC News 中文",
+       "snippet": "Published: 2026-09-18\n# 北京 - BBC News 中文\n\n# 北京\n\n\n\nHyrox失禁風波：澳洲選手道歉、主辦方承諾退款\n2026年9月18日\n\n\n\n人形機器人以外，一場中國機器革命正靜悄悄地發生\n2026年8月25日\n\n\n\n香港支聯會「煽動顛覆」案 高等法院裁定有罪\n2026年8月21日\n\n\n\n11:51\n\n視頻, 「結束一黨專政」：為何令支聯會煽動顛覆政權罪成？, 節目全長 11,51\n2026年8月21日\n\n\n\n「中國尊」撞機事件背後的三大疑點：禁區、動機、飛行員\n2026年6月28日\n\n\n\n小型飛機撞上北京最高樓「中國尊」 官方時隔近一天後證實\n2026年6月27日\n\n\n\n中國「八九」民運37週年：在傳承和記憶斷層間掙扎的「六四二代」\n2026年6月4日\n\n\n\n1:18\n\n視頻, 普京結束訪華離開北京, 節目全長 1,18\n2026年5月20日\n\n\n\n3:59:21\n\n視頻, 普京與習近平會談並出席簽約儀式, 節目全長 3,59,21\n2026年5月20日\n\n\n\n17:15\n\n視頻, 普京抵達北京展開訪華行程, 節目全長 17,15\n2026年5月1"
+      },
+      {
+       "url": "http://www.baidu.com/link?url=cBLAq2azNu0FTeVJMJaQNBaQ1mUBKohO1DczmF0jEKiqBTaEwgmPE1BqG1oQWdQcA1e-VFJpkSHrn0pJJa7Eua6gFFphLHNcJMokeGONeoG",
+       "title": "北京日报社区小板报｜新规来了！整治“幽灵外卖”",
+       "snippet": "# 北京日报社区小板报｜新规来了！整治“幽灵外卖”\n\nicon_voice_on icon_voice\n\n\n\n\n\n▶ 今日天气\n\n今天早晨山区有零星小雪，白天阴转多云，偏南风二三级，最高气温7℃；夜间多云转阴，南转北风一二级，最低气温-1℃。部分路段湿滑，出行请注意交通安全。今日气温下降，体感阴冷，外出注意添衣保暖。\n\n▶ 尾号限行\n\n2和7\n\n\n\n▶ 北京新增679个“电子警察”！抓拍违法停车、超速、闯红灯等\n\n2月25日，北京市公安局公安交通管理局网站发布《关于公布新增固定式交通技术监控设备的公告》。点击查看→ 详情>>\n\n▶ 防“幽灵外卖”，外卖平台应“实地核查”登记店铺\n\n\n\n市场监管总局对近期制定的《网络餐饮服务经营者落实食品安全主体责任监督管理规定》和《网络食品销售经营者落实食品安全主体责任监督管理规定》进行解读。为杜绝“幽灵外卖”，新规要求外卖平台应通过实地核查等方式，对外卖商家的食品经营许可证等经营资质证书进行实质性审查，至少每六个月对外卖商家登记的实际经营地址等信息进行一次核验更新。 详情>>\n\n▶ 796.52平方米违建清零！东四将新增100个停车位\n\n近日，东四街"
+      }
+     ]
+    }
+   }
+  }
+ },
+ {
+  "type": "response.chunk",
+  "event_id": "evt_fa471118931b40259f0c275a3c88483f_29",
+  "response_id": "427a6c46-a75a-4b27-8594-6a5e6ab8545e",
+  "item_id": "427a6c46-a75a-4b27-8594-6a5e6ab8545e",
+  "chunk": {
+   "metadata": {
+    "step_id": 2
+   },
+   "tool_usage_card": {
+    "tool_usage_card_id": "ca715b6e-0249-4b75-9446-fbb4b9f49748",
+    "open_page": {
+     "args": {
+      "url": "https://news.qq.com/d/bj"
+     }
+    }
+   }
+  }
+ },
+ {
+  "type": "response.chunk",
+  "event_id": "evt_fa471118931b40259f0c275a3c88483f_30",
+  "response_id": "427a6c46-a75a-4b27-8594-6a5e6ab8545e",
+  "item_id": "427a6c46-a75a-4b27-8594-6a5e6ab8545e",
+  "chunk": {
+   "metadata": {
+    "step_id": 2
+   },
+   "tool_usage_card": {
+    "tool_usage_card_id": "0a374121-408c-41b2-827c-4603c04608e5",
+    "open_page": {
+     "args": {
+      "url": "https://www.bjd.com.cn/app/rdjh/redian/"
+     }
+    }
+   }
+  }
+ },
+ {
+  "type": "response.chunk",
+  "event_id": "evt_fa471118931b40259f0c275a3c88483f_31",
+  "response_id": "427a6c46-a75a-4b27-8594-6a5e6ab8545e",
+  "item_id": "427a6c46-a75a-4b27-8594-6a5e6ab8545e",
+  "chunk": {
+   "metadata": {
+    "step_id": 2
+   },
+   "tool_result": {
+    "tool_call_id": "0a374121-408c-41b2-827c-4603c04608e5",
+    "web_search": {
+     "webpages": [
+      {
+       "url": "https://www.bjd.com.cn/app/rdjh/redian/",
+       "title": "京报网",
+       "snippet": "# 京报网\n\n热点\n\n[跟着古诗追月亮，一起看藏在文物里的中秋](//news.bjd.com.cn/2026/09/25/11973264.shtml) 2026-09-25 06:34\n\n[今天白天北京阴转多云，山区有阵雨，最高气温25℃](//news.bjd.com.cn/2026/09/25/11973256.shtml) 2026-09-25 06:06\n\n[人生没有小角色——追忆游本昌](//news.bjd.com.cn/2026/09/25/11973217.shtml) 2026-09-25 01:20\n\n[有AI｜玉兔携福迎佳节，燕京八绝贺中秋](//news.bjd.com.cn/2026/09/25/11973187.shtml) 2026-09-25 00:10\n\n[海报｜今晚共此月！北京日报客户端祝您中秋快乐](//news.bjd.com.cn/2026/09/25/11973172.shtml) 2026-09-25 00:00\n\n[2026年“百万英才兴海南·四城同办”校招活动走进北京](//news.bjd.com.cn/2026/09/24/11973151.shtml) 2026-09-24 23:37\n\n[著名焊接专家、机器人技术专家、哈工大原党委书记吴林逝世](//news.bjd.com.cn/2026/09/24/11973145.shtml) 2026-09-24 23:29\n\n[大熊猫“平平”“福双”将会落户美国亚特兰大动物园](//news.bjd.com.cn/2026/09/24/11973133.shtml) 2026-09-24 23:03\n\n[交通运输部：“高铁民航+落地租车”成出行新增长点](//news.bjd.com.cn/2026/09/24/11973130.shtml) 2026-09-24 23:01\n\n[亚运会｜明日看点：百米“飞人大战”上演，张展硕冲“七金王”](//news.bjd.com.cn/2026/09/24/11973108.shtml) 2026-09-24 22:35\n\n[六条环京旅游线路推出，一张联票玩转京津冀](//news.bjd.com.cn/2026/09/24/11973099.shtml) 2026-09-24 22:30\n\n[医院门口免费发爱心餐，全程直播！是暖心善举还是引流？](//news.bj"
+      }
+     ]
+    }
+   }
+  }
+ },
+ {
+  "type": "response.chunk",
+  "event_id": "evt_fa471118931b40259f0c275a3c88483f_32",
+  "response_id": "427a6c46-a75a-4b27-8594-6a5e6ab8545e",
+  "item_id": "427a6c46-a75a-4b27-8594-6a5e6ab8545e",
+  "chunk": {
+   "metadata": {
+    "step_id": 2
+   },
+   "tool_usage_card": {
+    "tool_usage_card_id": "160b29e8-98fb-4ffb-a647-065f52ba7cbd",
+    "open_page": {
+     "args": {
+      "url": "https://www.beijing.gov.cn/ywdt/yaowen/index_5.html"
+     }
+    }
+   }
+  }
+ },
+ {
+  "type": "response.chunk",
+  "event_id": "evt_fa471118931b40259f0c275a3c88483f_33",
+  "response_id": "427a6c46-a75a-4b27-8594-6a5e6ab8545e",
+  "item_id": "427a6c46-a75a-4b27-8594-6a5e6ab8545e",
+  "chunk": {
+   "metadata": {
+    "step_id": 2
+   },
+   "tool_usage_card": {
+    "tool_usage_card_id": "cd5db75a-e8d8-4fb1-95f8-aa9ea1f5b1c7",
+    "open_page": {
+     "args": {
+      "url": "https://news.qq.com/d/bj"
+     }
+    }
+   }
+  }
+ },
+ {
+  "type": "response.chunk",
+  "event_id": "evt_fa471118931b40259f0c275a3c88483f_34",
+  "response_id": "427a6c46-a75a-4b27-8594-6a5e6ab8545e",
+  "item_id": "427a6c46-a75a-4b27-8594-6a5e6ab8545e",
+  "chunk": {
+   "metadata": {
+    "step_id": 2
+   },
+   "tool_result": {
+    "tool_call_id": "ca715b6e-0249-4b75-9446-fbb4b9f49748",
+    "web_search": {
+     "webpages": [
+      {
+       "url": "https://news.qq.com/d/bj",
+       "title": "腾讯网",
+       "snippet": "No content found"
+      }
+     ]
+    }
+   }
+  }
+ },
+ {
+  "type": "response.chunk",
+  "event_id": "evt_fa471118931b40259f0c275a3c88483f_35",
+  "response_id": "427a6c46-a75a-4b27-8594-6a5e6ab8545e",
+  "item_id": "427a6c46-a75a-4b27-8594-6a5e6ab8545e",
+  "chunk": {
+   "metadata": {
+    "step_id": 2
+   },
+   "tool_result": {
+    "tool_call_id": "cd5db75a-e8d8-4fb1-95f8-aa9ea1f5b1c7",
+    "web_search": {
+     "webpages": [
+      {
+       "url": "https://news.qq.com/d/bj",
+       "title": "腾讯网",
+       "snippet": "No content found"
+      }
+     ]
+    }
+   }
+  }
+ },
+ {
+  "type": "response.chunk",
+  "event_id": "evt_fa471118931b40259f0c275a3c88483f_36",
+  "response_id": "427a6c46-a75a-4b27-8594-6a5e6ab8545e",
+  "item_id": "427a6c46-a75a-4b27-8594-6a5e6ab8545e",
+  "chunk": {
+   "metadata": {
+    "step_id": 2
+   },
+   "tool_result": {
+    "tool_call_id": "160b29e8-98fb-4ffb-a647-065f52ba7cbd",
+    "web_search": {
+     "webpages": [
+      {
+       "url": "https://www.beijing.gov.cn/ywdt/yaowen/index_5.html",
+       "title": "北京要闻",
+       "snippet": "# 北京要闻_首都之窗_北京市人民政府门户网站\n\n* [2027春夏北京时装周开幕 一票串起全链条消费场景](https://www.beijing.gov.cn/fuwu/bmfw/sy/jrts/202609/t20260908_4854516.html) 2026-09-08\n* [探访北京城市副中心 感受“千年之城”迸发的活力——一夏热度 十年厚度](https://www.beijing.gov.cn/fuwu/bmfw/sy/jrts/202609/t20260907_4852785.html) 2026-09-07\n* [23项北京地方标准有望升级为国标](https://www.beijing.gov.cn/ywdt/gzdt/202609/t20260907_4852787.html) 2026-09-07\n* [与大熊蜂对望 沉浸式触摸科技 这个周末 科普活动“卷”起来](https://www.beijing.gov.cn/fuwu/bmfw/sy/jrts/202609/t20260907_4852788.html) 2026-09-07\n* [“盯”排污 “嗅”燃气 “看”施工 亦庄“智慧哨兵天团”上岗记](https://www.beijing.gov.cn/fuwu/lqfw/gggs/202609/t20260907_4852791.html) 2026-09-07\n\n* [京九铁路开通运营30年 累计发送旅客17.7亿人次 提速时代 这趟慢列车缘何不可替代？](https://www.beijing.gov.cn/fuwu/bmfw/sy/jrts/202609/t20260907_4852796.html) 2026-09-07\n* [市民在日坛公园假山石上发现5亿年前化石？ 公园化石为城市科普开启新窗口](https://www.beijing.gov.cn/fuwu/bmfw/sy/jrts/202609/t20260907_4852800.html) 2026-09-07\n* [“京味儿”与“国际范儿”相遇北京坊 百年商圈文化新地标迎全球来客](https://www.beijing.gov.cn/fuwu/bmfw/sy/jrts/202609/t20260906_4852254.html) 2026-09-06\n* [28万专任教师书写教育强国建设的首都篇章](htt"
+      }
+     ]
+    }
+   }
+  }
+ },
+ {
+  "type": "response.chunk",
+  "chunk": {
+   "metadata": {
+    "step_id": 3
+   },
+   "text": {
+    "text": "**北京今日要闻**",
+    "channel": "CHANNEL_ASSISTANT_RESPONSE"
+   }
+  }
+ },
+ {
+  "type": "response.done",
+  "response": {
+   "id": "resp-fixture",
+   "status": "completed"
+  }
+ }
+]

@@ -1,0 +1,72 @@
+/* ============================================================================
+ * custom.css —— 在参考站点样式（app.css）之上的少量补充
+ * 只添加面板特有组件：日志行、账号行、导入框、图表、详情面板内容、结果列表。
+ * 配色沿用 app.css 的 CSS 变量，保持整体风格一致。
+ * ========================================================================== */
+
+/* ---------- 日志行：时间 / 搜索词 / 结果数 / 首字 / 总计 / 状态 / 箭头 ---------- */
+.log-row{grid-template-columns:72px minmax(150px,2.4fr) 96px 108px 108px 56px 12px!important;gap:12px;min-height:52px;padding:11px 18px;cursor:pointer}
+.log-row:hover{background:var(--ai-field-bg)}
+.log-time{font-size:11px;color:var(--ai-text-secondary);font-variant-numeric:tabular-nums}
+.log-query{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.log-counts,.log-ms{font-size:11px;color:var(--ai-text-secondary);font-variant-numeric:tabular-nums;white-space:nowrap}
+
+/* ---------- 账号行 ---------- */
+.acct-row{grid-template-columns:minmax(180px,2fr) 64px 128px 66px!important;gap:14px;min-height:64px;padding:13px 18px}
+.acct-state{font-size:12px;color:var(--oa-green);white-space:nowrap}
+.acct-state.dim{color:var(--ai-text-secondary)}
+.acct-stat{font-size:11px;color:var(--ai-text-secondary);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.node-dot.off{background:var(--oa-red)}
+
+/* ---------- 徽标 / 按钮 ---------- */
+.badge{display:inline-block;padding:3px 9px;border-radius:999px;font-size:10px;background:var(--ai-field-bg);color:var(--ai-text-secondary)}
+.badge.ok{background:rgba(100,189,152,.15);color:var(--oa-green)}
+.badge.fail{background:rgba(235,139,139,.15);color:var(--oa-red)}
+.pill.primary{background:var(--ai-primary);color:var(--ai-primary-text)}
+.pill.primary:hover{opacity:.9}
+.pill.danger{color:var(--oa-red)}
+.pill.danger:hover{background:rgba(235,139,139,.12)}
+
+/* ---------- 批量导入框 ---------- */
+.import-box{background:var(--ai-surface-container-low);border-radius:12px;padding:14px 16px;margin-bottom:18px}
+.import-box textarea{width:100%;background:var(--ai-field-bg);border:0;border-radius:11px;padding:11px 12px;color:var(--ai-text);font-size:12px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;line-height:1.7;resize:vertical}
+.import-box textarea::placeholder{color:var(--ai-text-secondary);font-family:inherit}
+.import-box textarea:focus-visible{box-shadow:0 0 0 3px var(--ai-focus-shadow)}
+.import-actions{display:flex;align-items:center;gap:12px;margin-top:10px}
+
+/* ---------- 搜索词 chips ---------- */
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:22px}
+.chip{padding:4px 10px;border-radius:999px;background:var(--ai-surface-container-high);font-size:11px;color:var(--ai-text-secondary)}
+
+/* ---------- 结果列表（搜索测试与详情面板共用，条目可点） ---------- */
+.result-list{display:flex;flex-direction:column;gap:6px;margin-bottom:26px}
+.result-item{background:var(--ai-surface-container-low);border-radius:12px;padding:14px 18px;display:flex;flex-direction:column;gap:6px;cursor:pointer}
+.result-item:hover{background:var(--ai-field-bg)}
+.result-title{font-size:13px;font-weight:550;color:var(--ai-text)}
+.result-summary{font-size:12px;line-height:1.75;color:var(--ai-text-secondary);word-break:break-word}
+.result-meta{font-size:10px;color:var(--ai-text-secondary);opacity:.8;word-break:break-all}
+
+/* ---------- 概览图表 ---------- */
+.perf-baseline{stroke:var(--ai-border);stroke-width:.8}
+.perf-line{fill:none;stroke:var(--ai-text);stroke-width:1.4;vector-effect:non-scaling-stroke}
+.perf-area{fill:rgba(237,237,239,.07);stroke:none}
+.perf-dot{fill:var(--oa-red)}
+.legend-line.err{background:var(--oa-red)}
+
+/* ---------- 日志无限滚动提示 ---------- */
+.load-more{text-align:center;font-size:11px;color:var(--ai-text-secondary);opacity:.75;padding:14px 0 4px}
+
+/* ---------- 详情面板内容 ---------- */
+.detail-title{font-size:15px;font-weight:550;line-height:1.45;margin-bottom:6px;overflow-wrap:anywhere}
+.detail-subtitle{font-size:11px;color:var(--ai-text-secondary);margin-bottom:16px;overflow-wrap:anywhere}
+.detail-body{font-size:12px;line-height:1.85;color:var(--ai-text);white-space:pre-wrap;overflow-wrap:anywhere;margin-bottom:16px}
+.detail-actions{display:flex;gap:8px;margin-top:12px}
+.detail-panel .result-item{padding:12px 14px}
+
+/* ---------- 响应式：窄屏隐藏次要列 ---------- */
+@media(max-width:960px){
+  .log-row{grid-template-columns:64px minmax(120px,2fr) 56px 12px!important}
+  .log-counts,.log-ms{display:none}
+  .acct-row{grid-template-columns:minmax(150px,2fr) 60px 66px!important}
+  .acct-stat{display:none}
+}

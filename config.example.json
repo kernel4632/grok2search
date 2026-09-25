@@ -1,0 +1,31 @@
+{
+  "//": "grok2search 配置（Docker 挂载到 /app/config.json）",
+  "port": 8080,
+  "panel": {
+    "user": "admin",
+    "pass": "@grok2search",
+    "//": "面板登录（浏览器原生 Basic 弹窗）"
+  },
+  "clientKeys": [
+    "change-me-client-key"
+  ],
+  "accountsFile": "accounts.json",
+  "flareSolverrUrl": "http://flaresolverr:8191/v1",
+  "upstream": {
+    "baseUrl": "https://grok.com",
+    "sessionModel": "fast"
+  },
+  "search": {
+    "//": "attempts=失败换号次数; quietMs=搜索静默收工; maxMs=单路硬超时",
+    "attempts": 3,
+    "quietMs": 4000,
+    "maxMs": 18000,
+    "snippetMaxChars": 500,
+    "maxPages": 40,
+    "maxPosts": 20,
+    "instruction": "You MUST use web search (and X/Twitter search when relevant) to gather the latest, most accurate and up-to-date information before answering. Always search first, then answer based on the search results, and cite your sources in your response.",
+    "firstProgressMs": 8000
+  },
+  "cooldownMs": 60000,
+  "clearanceTtlMs": 600000
+}

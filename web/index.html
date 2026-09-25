@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#19191b">
+  <meta name="description" content="Grok2Search 监控面板">
+  <title>Grok2Search Monitor</title>
+  <!-- 全套沿用 monitor.onyxaxis.org 的样式表；补充样式见 custom.css -->
+  <link rel="stylesheet" href="assets/app.css">
+  <link rel="stylesheet" href="assets/custom.css">
+</head>
+<body>
+  <!-- 图标定义：与参考站点同名同形状 -->
+  <svg class="icon-defs" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <symbol id="i-arc" viewBox="0 0 24 24"><path d="M5 18v-6a7 7 0 0 1 14 0v6M5 14h14M16 5l3-2"/></symbol>
+    <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></symbol>
+    <symbol id="i-network" viewBox="0 0 24 24"><path d="M3 12h4l3-7 4 14 3-7h4"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></symbol>
+    <symbol id="i-server" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="7" rx="2"/><rect x="3" y="14" width="18" height="7" rx="2"/><path d="M7 6.5h.01M7 17.5h.01M11 6.5h6M11 17.5h6"/></symbol>
+    <symbol id="i-external" viewBox="0 0 24 24"><path d="M14 3h7v7m0-7L11 13M10 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5"/></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m7 12 3 3 7-7"/><rect x="3" y="3" width="18" height="18" rx="6"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></symbol>
+  </svg>
+
+  <!-- 说明：Vue 挂载在 #app 上，只编译其内部 HTML；因此 class 绑定必须放在内部元素上 -->
+  <div id="app">
+  <div class="workspace" :class="{ 'rail-collapsed': railCollapsed, 'detail-open': detail.open }">
+    <!-- 顶栏 -->
+    <header class="shell-header">
+      <button class="icon-button panel-toggle" aria-label="切换侧栏" @click="railCollapsed = !railCollapsed"><svg><use href="#i-menu"/></svg></button>
+      <a class="brand" href="#overview" @click.prevent="view = 'overview'">
+        <svg class="brand-mark"><use href="#i-arc"/></svg><span>Grok2Search Monitor</span>
+      </a>
+      <div class="header-end">
+        <span class="connection" :class="connected ? 'live' : 'error'" role="status">
+          <span class="status-dot"></span><span>{{ connected ? '实时连接' : '连接断开' }}</span>
+        </span>
+        <a class="icon-button" href="docs" target="_blank" title="API 文档"><svg><use href="#i-external"/></svg></a>
+      </div>
+    </header>
+
+    <div class="workspace-body">
+      <!-- 左侧导航 -->
+      <aside class="rail">
+        <div class="rail-caption">工作空间</div>
+        <nav aria-label="主导航">
+          <a v-for="tab in tabs" :key="tab.id" class="nav-item" :class="{ active: view === tab.id }" :href="'#' + tab.id"
+             :aria-label="tab.label" @click.prevent="view = tab.id">
+            <svg><use :href="tab.icon"/></svg><span>{{ tab.label }}</span>
+            <span class="nav-count" v-if="navCount(tab) !== null">{{ navCount(tab) }}</span>
+          </a>
+        </nav>
+        <div class="rail-spacer"></div>
+        <div class="rail-status">
+          <svg><use href="#i-server"/></svg>
+          <div><span>{{ status.accounts.total }} 个账号 · 空闲 {{ status.accounts.idle }}</span><small>更新于 {{ lastUpdate }}</small></div>
+        </div>
+      </aside>
+
+      <!-- 主面板 -->
+      <main class="main-panel"><div class="main-scroll" ref="scroll" @scroll="onScroll">
+        <div class="page-heading">
+          <div><p class="eyebrow">GROK2SEARCH</p><h1>{{ currentTab.label }}</h1></div>
+          <span class="date-label">{{ now }}</span>
+        </div>
+
+        <!-- ===================== 概览 ===================== -->
+        <section v-show="view === 'overview'">
+          <section class="summary">
+            <div class="summary-primary">
+              <span class="metric-label">账号总数</span>
+              <div class="headline-metric"><strong>{{ status.accounts.total }}</strong><span>/ 空闲 {{ status.accounts.idle }}</span></div>
+              <span class="summary-note">忙碌 {{ status.accounts.busy }} · 冷却 {{ status.accounts.cooldown }}</span>
+            </div>
+            <div class="summary-secondary">
+              <div><span class="metric-label">平均首字</span><strong>{{ recent.avgFirst }} ms</strong></div>
+              <div><span class="metric-label">平均总耗时</span><strong>{{ recent.avgMs }} ms</strong></div>
+              <div><span class="metric-label">成功率</span><strong>{{ recent.rate }}%</strong></div>
+            </div>
+            <div class="summary-traffic">
+              <div class="traffic-heading">
+                <span class="metric-label">最近请求耗时趋势</span>
+                <div class="chart-legend"><span><i class="legend-line"></i>成功</span><span><i class="legend-line err"></i>失败</span></div>
+              </div>
+              <svg class="summary-chart" viewBox="0 0 400 45" preserveAspectRatio="none" role="img" aria-label="最近请求耗时趋势">
+                <line class="perf-baseline" x1="0" y1="44" x2="400" y2="44"></line>
+                <polyline v-if="perf.points" class="perf-area" :points="perf.area"></polyline>
+                <polyline v-if="perf.points" class="perf-line" :points="perf.points"></polyline>
+                <circle v-for="(dot, i) in perf.dots" :key="i" class="perf-dot" :cx="dot.x" :cy="dot.y" r="2.4"></circle>
+              </svg>
+              <span class="summary-note">峰值 {{ perf.max }} ms · {{ status.model }} · {{ status.clearance.cached ? '清关有效' : '清关待刷新' }} · 运行 {{ uptimeText }}</span>
+            </div>
+          </section>
+          <div class="section-heading"><h2>最近请求</h2><span class="subtle">点击任意一条查看搜索结果 · 每 2 秒自动刷新</span></div>
+          <div class="nodes">
+            <div class="node-row log-row" v-for="item in logs.slice(0, 8)" :key="item.id" @click="openLog(item)">
+              <span class="log-time">{{ shortTime(item.at) }}</span>
+              <span class="log-query">{{ item.query || '—' }}</span>
+              <span class="log-counts">{{ item.pages ?? 0 }} 页 / {{ item.posts ?? 0 }} 帖</span>
+              <span class="log-ms">首字 {{ item.firstResultMs ?? '—' }} ms</span>
+              <span class="log-ms">总计 {{ item.elapsedMs ?? '—' }} ms</span>
+              <span class="log-result"><span class="badge" :class="item.ok ? 'ok' : 'fail'">{{ item.ok ? '成功' : '失败' }}</span></span>
+              <svg class="node-chevron"><use href="#i-chevron"/></svg>
+            </div>
+            <div v-if="logs.length === 0" class="empty-state"><svg><use href="#i-search"/></svg><h2>还没有搜索记录</h2><p>去「搜索测试」发一次，或在浏览器里调用 /v1/chat/completions。</p></div>
+          </div>
+        </section>
+
+        <!-- ===================== 账号池 ===================== -->
+        <section v-show="view === 'accounts'">
+          <div class="list-toolbar">
+            <div class="filter-tabs"><button class="selected">全部 {{ status.accounts.total }}</button><button>空闲 {{ status.accounts.idle }}</button><button>冷却 {{ status.accounts.cooldown }}</button></div>
+            <div class="list-tools"><button class="pill" @click="reloadAccounts">重新载入号池</button></div>
+          </div>
+          <!-- 批量导入：每行一个 sso，uid 自动解析（与 grok2api 的导入体验一致） -->
+          <div class="import-box">
+            <textarea v-model="form.ssoText" rows="5" spellcheck="false"
+              placeholder="批量导入：每行一个 SSO（支持 sso= 前缀），uid 会自动解析&#10;eyJhbGciOi...&#10;eyJhbGciOi..."></textarea>
+            <div class="import-actions">
+              <button class="pill primary" :disabled="!form.ssoText.trim() || busy.import" @click="importAccounts">{{ busy.import ? '导入中…' : '批量导入' }}</button>
+              <span class="subtle" v-if="form.importResult">{{ form.importResult }}</span>
+            </div>
+            <p v-if="notice" class="notice" role="status">{{ notice }}</p>
+          </div>
+          <div class="nodes">
+            <div class="node-row acct-row" v-for="account in accounts" :key="account.uid">
+              <span class="node-identity">
+                <span class="node-glyph"><svg><use href="#i-server"/></svg><i class="node-dot" :class="{ off: accountState(account) !== '空闲' }"></i></span>
+                <span class="node-name-wrap">
+                  <strong class="node-name">{{ account.name || account.id }}</strong>
+                  <span class="node-subtitle">{{ account.uid }}</span>
+                </span>
+              </span>
+              <span class="acct-state" :class="accountState(account) === '空闲' ? '' : 'dim'">{{ accountState(account) }}</span>
+              <span class="acct-stat">成功 {{ account.ok }} · 失败 {{ account.fail }}</span>
+              <button class="pill danger" :disabled="busy.del === account.id" @click="removeAccount(account)">删除</button>
+            </div>
+            <div v-if="accounts.length === 0" class="empty-state"><svg><use href="#i-server"/></svg><h2>号池为空</h2><p>用 grok2api 的导出脚本生成 accounts.json，或在上方批量导入 SSO。</p></div>
+          </div>
+        </section>
+
+        <!-- ===================== 搜索测试 ===================== -->
+        <section v-show="view === 'search'">
+          <div class="list-toolbar">
+            <label class="search" style="max-width:420px;flex:1">
+              <svg><use href="#i-search"/></svg>
+              <input v-model.trim="test.query" placeholder="输入问题，例如：今天北京有什么新闻" @keyup.enter="runTest">
+            </label>
+            <div class="list-tools">
+              <button class="pill primary" :disabled="!test.query || test.loading" @click="runTest">{{ test.loading ? '搜索中…' : '开始搜索' }}</button>
+              <span class="subtle" v-if="test.elapsedMs">总耗时 {{ test.elapsedMs }} ms</span>
+            </div>
+          </div>
+          <p v-if="test.error" class="notice">{{ test.error }}</p>
+
+          <template v-if="test.result">
+            <div class="chips">
+              <span class="chip" v-for="q in test.result.queries" :key="q">{{ q }}</span>
+            </div>
+            <div class="section-heading"><h2>网页结果（{{ test.result.pages.length }}）</h2><span class="subtle">点击任意一条查看完整内容</span></div>
+            <div class="result-list">
+              <div class="result-item" v-for="page in test.result.pages" :key="page.url" @click="openItem('page', page)">
+                <span class="result-title">{{ page.title || page.url }}</span>
+                <p class="result-summary">{{ clean(page.snippet, 260) }}</p>
+                <span class="result-meta">{{ host(page.url) }} · 搜索词：{{ page.query || '—' }}</span>
+              </div>
+            </div>
+            <div class="section-heading" v-if="test.result.posts.length"><h2>X 讨论（{{ test.result.posts.length }}）</h2></div>
+            <div class="result-list">
+              <div class="result-item" v-for="post in test.result.posts" :key="post.url" @click="openItem('post', post)">
+                <span class="result-title">@{{ post.handle }}（{{ post.name }}）</span>
+                <p class="result-summary">{{ clean(post.text, 260) }}</p>
+                <span class="result-meta">{{ post.createdAt }} · {{ post.views ?? '—' }} 浏览 · {{ post.likes ?? '—' }} 赞</span>
+              </div>
+            </div>
+          </template>
+          <div v-else-if="!test.loading" class="empty-state"><svg><use href="#i-search"/></svg><h2>搜索测试</h2><p>这里调用与下游 API 完全相同的搜索链路（单路会话 + 失败换号），不会写日志到生产 Key。</p></div>
+        </section>
+
+        <!-- ===================== 请求日志（无限滚动） ===================== -->
+        <section v-show="view === 'logs'">
+          <div class="list-toolbar">
+            <div class="filter-tabs"><button class="selected">已加载 {{ logs.length }} 条</button></div>
+            <div class="list-tools"><span class="subtle">实时推送 · 点击任意一条查看搜索结果</span></div>
+          </div>
+          <div class="nodes">
+            <div class="node-row log-row" v-for="item in logs" :key="item.id" @click="openLog(item)">
+              <span class="log-time">{{ shortTime(item.at) }}</span>
+              <span class="log-query">{{ item.query || '—' }}</span>
+              <span class="log-counts">{{ item.pages ?? 0 }} 页 / {{ item.posts ?? 0 }} 帖</span>
+              <span class="log-ms">首字 {{ item.firstResultMs ?? '—' }} ms</span>
+              <span class="log-ms">总计 {{ item.elapsedMs ?? '—' }} ms</span>
+              <span class="log-result"><span class="badge" :class="item.ok ? 'ok' : 'fail'">{{ item.ok ? '成功' : '失败' }}</span></span>
+              <svg class="node-chevron"><use href="#i-chevron"/></svg>
+            </div>
+            <div v-if="logs.length === 0" class="empty-state"><svg><use href="#i-network"/></svg><h2>暂无日志</h2><p>搜索请求会实时出现在这里。</p></div>
+            <div class="load-more" v-else>{{ loadingMore ? '正在加载更早的日志…' : (hasMore ? '继续下滑加载更早的日志' : '已经到底了') }}</div>
+          </div>
+        </section>
+      </div></main>
+
+      <!-- ===================== 右侧详情面板（点击日志/结果后展示） ===================== -->
+      <aside class="detail-panel" aria-label="详情" aria-hidden="false">
+        <div class="detail-scroll">
+          <div class="detail-top">
+            <span class="eyebrow">DETAIL</span>
+            <button class="icon-button" aria-label="关闭详情" @click="detail.open = false"><svg><use href="#i-close"/></svg></button>
+          </div>
+          <h2 class="detail-title">{{ detail.title || '详情' }}</h2>
+          <p class="detail-subtitle" v-if="detail.subtitle">{{ detail.subtitle }}</p>
+
+          <!-- 详情元信息 -->
+          <div class="detail-metric" v-if="detail.meta.length">
+            <div v-for="(row, i) in detail.meta" :key="i"><span>{{ row[0] }}</span><strong>{{ row[1] }}</strong></div>
+          </div>
+
+          <!-- 单条内容详情（搜索测试点进来的） -->
+          <template v-if="detail.item">
+            <p class="detail-body">{{ detail.item.snippet || detail.item.text }}</p>
+            <div class="detail-actions">
+              <a class="pill primary" :href="detail.item.url" target="_blank" rel="noreferrer">打开原文</a>
+            </div>
+          </template>
+
+          <!-- 日志结果详情（点日志进来的：完整搜索结果列表） -->
+          <template v-else>
+            <p v-if="detail.loading" class="detail-subtitle">正在加载结果快照…</p>
+            <p v-else-if="detail.expired" class="detail-subtitle">该日志的结果快照已过期（仅保留最近 300 条），请点击更新的一条查看。</p>
+            <template v-else>
+              <div class="section-heading" v-if="detail.pages.length"><h2>网页（{{ detail.pages.length }}）</h2></div>
+              <div class="result-list">
+                <div class="result-item" v-for="page in detail.pages" :key="page.url" @click="openItem('page', page)">
+                  <span class="result-title">{{ page.title || page.url }}</span>
+                  <p class="result-summary">{{ clean(page.snippet, 220) }}</p>
+                  <span class="result-meta">{{ host(page.url) }}</span>
+                </div>
+              </div>
+              <div class="section-heading" v-if="detail.posts.length"><h2>X 讨论（{{ detail.posts.length }}）</h2></div>
+              <div class="result-list">
+                <div class="result-item" v-for="post in detail.posts" :key="post.url" @click="openItem('post', post)">
+                  <span class="result-title">@{{ post.handle }}</span>
+                  <p class="result-summary">{{ clean(post.text, 220) }}</p>
+                  <span class="result-meta">{{ post.createdAt }}</span>
+                </div>
+              </div>
+            </template>
+          </template>
+        </div>
+      </aside>
+    </div>
+  </div>
+  </div>
+
+  <script src="assets/vue.js"></script>
+  <script src="assets/app.js"></script>
+</body>
+</html>

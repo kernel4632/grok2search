@@ -1,0 +1,24 @@
+# 镜像构建时排除：这些内容要么会重新安装，要么含敏感信息
+node_modules
+bun.lockb
+dist
+
+# 隐私配置与号池（镜像内通过 compose 挂载）
+config.json
+accounts.json
+accounts.json.tmp
+
+# 运行数据与日志
+data
+logs
+*.log
+nohup.out
+
+# 开发相关
+test
+*.md
+.git
+.gitignore
+.dockerignore
+.DS_Store
+.playwright-mcp

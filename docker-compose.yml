@@ -1,0 +1,77 @@
+# ============================================================================
+# grok2search 编排 —— 一键启动：搜索网关 + 自带 FlareSolverr（开箱即用）
+# ============================================================================
+# 目录约定（与本机现有规范一致）：
+#   /opt/grok2search/            -> 项目与 compose 定义
+#   /data/apps/grok2search/      -> 运行时数据（可选，默认直接用项目内 data/）
+#
+# 端口：宿主机 127.0.0.1:46328 -> 容器 8080（只绑本机，公网走宝塔 Nginx 反代）
+# 网络：grok2search（内部服务名即账号，其他容器接入后可用 http://grok2search:8080 直连）
+# ============================================================================
+name: grok2search
+
+services:
+  grok2search:
+    build: .
+    image: grok2search:local
+    container_name: grok2search
+    restart: unless-stopped
+    init: true
+    ports:
+      # 只监听本机，公网访问交给宝塔反向代理 + HTTPS
+      - "127.0.0.1:46328:8080"
+    environment:
+      TZ: "${TZ:-Asia/Shanghai}"
+      # 配置与号池路径（容器内路径；文件由下面 volumes 挂载）
+      GROK2SEARCH_CONFIG: /app/config.json
+      GROK2SEARCH_ACCOUNTS_FILE: /app/accounts.json
+      # 若不想把 FlareSolverr 地址写在 config.json，可用这个环境变量覆盖
+      # GROK2SEARCH_FLARESOLVERR_URL: http://flaresolverr:8191/v1
+    volumes:
+      # 配置只读挂载：容器内改不了，避免误操作
+      - ./config.json:/app/config.json:ro
+      # 号池可写挂载：管理端 API 增删账号需要回写文件
+      - ./accounts.json:/app/accounts.json
+      # 前端源码可热替换：改完 web/ 后 docker compose restart 即可生效，无需重建镜像
+      - ./web:/app/web:ro
+      # 运行数据（预留：后续如需落盘日志/缓存）
+      - ./data:/app/data
+    networks:
+      - grok2search
+    depends_on:
+      flaresolverr:
+        condition: service_started
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # --------------------------------------------------------------------------
+  # Cloudflare 清关服务：grok.com 前面有 CF，需要用无头浏览器解一次 Cookie。
+  # 默认地址（容器内）：http://flaresolverr:8191/v1（config.json 默认值）
+  # --------------------------------------------------------------------------
+  flaresolverr:
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    container_name: grok2search-flaresolverr
+    restart: unless-stopped
+    environment:
+      TZ: "${TZ:-Asia/Shanghai}"
+      LOG_LEVEL: info
+    networks:
+      - grok2search
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  # 固定网络名（不加 -net 后缀）：其他容器要调用时直连本网络即可
+  grok2search:
+    name: grok2search
+    driver: bridge

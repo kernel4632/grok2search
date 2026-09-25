@@ -1,0 +1,37 @@
+# ============================================================================
+# 公开仓库排除清单：绝不提交任何密钥/凭据/运行数据
+# ============================================================================
+
+# ---- 依赖与构建产物 ----
+node_modules/
+bun.lockb
+dist/
+coverage/
+*.tsbuildinfo
+
+# ---- 隐私配置与号池（最重要！含面板密码/API 密钥/SSO 登录态）----
+config.json
+accounts.json
+accounts.json.tmp
+*.local.json
+
+# ---- 运行数据与日志 ----
+data/
+logs/
+*.log
+nohup.out
+
+# ---- 编辑器/系统杂物 ----
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+.swp
+*.swp
+*~
+.playwright-mcp/
+
+# ---- 临时/备份文件 ----
+*.bak
+*.tmp
+*.old

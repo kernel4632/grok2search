@@ -1,0 +1,22 @@
+{
+  "//": "grok2search —— 基于 Grok Web 协议的多账号搜索网关。依赖只有 elysia 及其官方插件，尽量用框架能力换代码量。",
+  "name": "grok2search",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "module": "src/index.ts",
+  "scripts": {
+    "start": "bun src/index.ts",
+    "dev": "bun --watch src/index.ts",
+    "test": "bun test",
+    "export-accounts": "bun scripts/export-accounts.ts"
+  },
+  "dependencies": {
+    "@elysiajs/cors": "^1.4.2",
+    "@elysiajs/swagger": "^1.3.1",
+    "elysia": "^1.4.30"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  }
+}

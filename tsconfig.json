@@ -1,0 +1,16 @@
+{
+  "//": "Bun 原生执行 TypeScript，无需编译。这里仅约束严格模式与模块解析，保证类型检查足够严格。",
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "moduleDetection": "force",
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "types": ["bun-types"],
+    "lib": ["ESNext"]
+  },
+  "include": ["src", "scripts", "test"]
+}

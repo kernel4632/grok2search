@@ -1,0 +1,9 @@
+[
+  {
+    "//": "账号示例。真实文件用 scripts/export-accounts.ts 从 grok2api 数据库导出，或通过 POST /admin/accounts 添加。",
+    "id": "web-001",
+    "name": "示例账号",
+    "uid": "00000000-0000-0000-0000-000000000000",
+    "sso": "eyJhbGciOi...（grok.com 的 sso JWT，浏览器 Cookie 里 sso= 的值）"
+  }
+]
