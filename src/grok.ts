@@ -71,7 +71,10 @@ export interface SearchConfig {
   instruction: string;
   quietMs: number;
   maxMs: number;
-  attempts: number;
+  /** 单次请求最多换多少个账号（换号重试的上限；号池没耗尽前会一直换） */
+  maxAttempts: number;
+  /** 单次请求的重试总预算（毫秒）：超过则返回最后一次错误 */
+  retryBudgetMs: number;
   maxPages: number;
   maxPosts: number;
   sessionModel: string;
@@ -135,8 +138,11 @@ export function getSearchResult(id: number): { text: string; json: unknown } | u
 // ============================================================================
 
 export class Pool {
-  private accounts: (Account & { busy: boolean; cooldownUntil: number; ok: number; fail: number; lastError?: string })[] = [];
+  private accounts: (Account & { busy: boolean; cooldownUntil: number; ok: number; fail: number; streak: number; lastError?: string })[] = [];
   private cursor = 0;
+
+  /** 连续失败的最大退避冷却（30 分钟）：疑似坏号会被逐渐"冷藏"，避免反复占用尝试机会 */
+  private static readonly MAX_BACKOFF_MS = 30 * 60_000;
 
   constructor(
     private file: string,
@@ -153,7 +159,7 @@ export class Pool {
       if (!a?.uid || !a?.sso || seen.has(a.uid) || !/^[0-9a-f-]{36}$/i.test(a.uid)) return [];
       seen.add(a.uid);
       const old = before.get(a.uid);
-      return [{ id: a.id ?? `web-${a.uid.slice(0, 8)}`, name: a.name, uid: a.uid, sso: a.sso, busy: false, cooldownUntil: 0, ok: old?.ok ?? 0, fail: old?.fail ?? 0 }];
+      return [{ id: a.id ?? `web-${a.uid.slice(0, 8)}`, name: a.name, uid: a.uid, sso: a.sso, busy: false, cooldownUntil: 0, ok: old?.ok ?? 0, fail: old?.fail ?? 0, streak: old?.streak ?? 0 }];
     });
     this.cursor = 0;
   }
@@ -184,10 +190,18 @@ export class Pool {
 
   /** 取一个空闲账号（跳过忙/冷却；轮询保证均匀） */
   acquire() {
+    return this.acquireExcept(new Set());
+  }
+
+  /**
+   * 取一个"空闲且不在 tried 里"的账号（tried = 本次请求已经试过的 uid）。
+   * 换号重试时用它保证不重复踩同一个账号；返回 null 表示当前没有可用账号。
+   */
+  acquireExcept(tried: Set<string>) {
     const now = Date.now();
     for (let i = 0; i < this.accounts.length; i++) {
       const account = this.accounts[(this.cursor + i) % this.accounts.length]!;
-      if (account.busy || account.cooldownUntil > now) continue;
+      if (tried.has(account.uid) || account.busy || account.cooldownUntil > now) continue;
       account.busy = true;
       this.cursor = (this.cursor + i + 1) % this.accounts.length;
       return account;
@@ -195,16 +209,20 @@ export class Pool {
     return null;
   }
 
-  /** 归还账号：失败进冷却，成功+1 */
+  /** 归还账号：成功清零连败；失败按"连续失败次数"指数退避冷却（60s → 2m → 4m … 封顶 30m） */
   release(account: Account, ok: boolean, error?: string) {
     const target = this.accounts.find((a) => a.uid === account.uid);
     if (!target) return;
     target.busy = false;
-    if (ok) target.ok += 1;
-    else {
+    if (ok) {
+      target.ok += 1;
+      target.streak = 0; // 成功即恢复正常
+    } else {
       target.fail += 1;
+      target.streak += 1;
       target.lastError = error?.slice(0, 200);
-      target.cooldownUntil = Date.now() + this.cooldownMs;
+      const backoff = Math.min(this.cooldownMs * 2 ** (target.streak - 1), Pool.MAX_BACKOFF_MS);
+      target.cooldownUntil = Date.now() + backoff;
     }
   }
 
@@ -218,7 +236,7 @@ export class Pool {
       this.save();
       return existing;
     }
-    const account = { id: input.id || `web-${this.accounts.length + 1}-${input.uid.slice(0, 8)}`, name: input.name, uid: input.uid, sso: input.sso, busy: false, cooldownUntil: 0, ok: 0, fail: 0 };
+    const account = { id: input.id || `web-${this.accounts.length + 1}-${input.uid.slice(0, 8)}`, name: input.name, uid: input.uid, sso: input.sso, busy: false, cooldownUntil: 0, ok: 0, fail: 0, streak: 0 };
     this.accounts.push(account);
     try { this.save(); } catch (error) { this.accounts.pop(); throw error; }
     return account;
@@ -523,11 +541,18 @@ export class Searcher {
     private config: SearchConfig,
   ) {}
 
-  /** 搜索一次：按 attempts 换号重试（不等总结，正常 3~18 秒返回）
-   *  onDelta：可选增量回调——流式接口用它实现"边搜边发"（每收集到一条结果立即回调）。 */
+  /**
+   * 搜索一次：**换号重试直到成功**（除非号池耗尽/重试预算用尽）。
+   *   - 每个账号只试一次（tried 去重），失败账号进冷却（连续失败指数退避）；
+   *   - 没有空闲账号时短暂等待（可能有账号即将结束/冷却到期），直到预算用完；
+   *   - 只有"号池为空 / 全池都试过且失败 / 预算与次数上限用尽"才会抛错。
+   *  onDelta：可选增量回调——流式接口用它实现"边搜边发"（每收集到一条结果立即回调）。
+   */
   async search(query: string, caller: string, onDelta?: (chunk: string) => void): Promise<SearchData> {
     const startedAt = Date.now();
+    const tried = new Set<string>(); // 本次请求已尝试过的账号 uid
     let lastError: Error | undefined;
+
     // 流式跨尝试去重：某一路失败换号后，已经下发过的结果不重复发
     const streamed = new Set<string>();
     let streamIndex = 0;
@@ -538,9 +563,26 @@ export class Searcher {
           onDelta(streamItem(kind, item, ++streamIndex, this.config.snippetMaxChars));
         }
       : undefined;
-    for (let attempt = 0; attempt < this.config.attempts; attempt++) {
-      const account = this.pool.acquire();
-      if (!account) throw new NoAccountError("号池无可用账号");
+
+    while (true) {
+      // ---- 停止条件：次数上限 / 时间预算 ----
+      if (tried.size >= this.config.maxAttempts) break;
+      if (Date.now() - startedAt > this.config.retryBudgetMs) break;
+
+      // ---- 取一个"没试过且空闲"的账号 ----
+      const account = this.pool.acquireExcept(tried);
+      if (!account) {
+        const stats = this.pool.stats();
+        // 号池本身就是空的：直接判定耗尽
+        if (stats.total === 0) throw new NoAccountError("号池为空，请先在面板/accounts.json 添加账号");
+        // 全池账号都试过且失败：本请求判定耗尽
+        if (tried.size >= stats.total) break;
+        // 还有没试过的号，只是都在忙/冷却：等一小会儿再看（受预算约束）
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        continue;
+      }
+
+      tried.add(account.uid);
       try {
         const data = await collectSession(account, query, this.config, this.clearance, () => crypto.randomUUID(), new AbortController().signal, emit);
         this.pool.release(account, true);
@@ -549,17 +591,23 @@ export class Searcher {
           { caller, query, accountId: account.id, pages: data.pages.length, posts: data.posts.length, firstResultMs: data.firstResultMs, elapsedMs: data.elapsedMs ?? Date.now() - startedAt, ok: true },
           { text: toText(data, query, this.config.snippetMaxChars), json: toJSON(data) },
         );
-        log("info", "search", { logId: entry.id, caller, query, accountId: account.id, pages: data.pages.length, posts: data.posts.length, firstResultMs: data.firstResultMs, elapsedMs: entry.elapsedMs, ok: true });
+        log("info", "search", { logId: entry.id, caller, query, accountId: account.id, attempts: tried.size, pages: data.pages.length, posts: data.posts.length, firstResultMs: data.firstResultMs, elapsedMs: Date.now() - startedAt, ok: true });
         return data;
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
         this.pool.release(account, false, lastError.message);
         // 每次换号都记一行（控制台可见），方便定位坏号与失败原因
-        log("warn", "search_attempt_failed", { caller, query, accountId: account.id, attempt: attempt + 1, error: lastError.message });
+        log("warn", "search_attempt_failed", { caller, query, accountId: account.id, attempt: tried.size, error: lastError.message });
+        // 不做其他处理：循环继续换下一个号
       }
     }
-    const entry = recordSearch({ caller, query, elapsedMs: Date.now() - startedAt, ok: false, error: lastError?.message });
-    log("warn", "search", { logId: entry.id, caller, query, elapsedMs: entry.elapsedMs, ok: false, error: lastError?.message });
-    throw lastError ?? new Error("搜索失败");
+
+    // ---- 全部兜底都失败：记录并抛出（这才是真正的 502 来源） ----
+    const reason = tried.size === 0
+      ? new NoAccountError("号池无空闲账号（全部忙碌或冷却中），请稍后重试或补充账号")
+      : (lastError ?? new Error("搜索失败"));
+    const entry = recordSearch({ caller, query, elapsedMs: Date.now() - startedAt, ok: false, error: `${reason.message}（已尝试 ${tried.size} 个账号）` });
+    log("warn", "search", { logId: entry.id, caller, query, attempts: tried.size, elapsedMs: entry.elapsedMs, ok: false, error: reason.message });
+    throw reason;
   }
 }

@@ -135,7 +135,7 @@
                 </span>
               </span>
               <span class="acct-state" :class="accountState(account) === '空闲' ? '' : 'dim'">{{ accountState(account) }}</span>
-              <span class="acct-stat">成功 {{ account.ok }} · 失败 {{ account.fail }}</span>
+              <span class="acct-stat">成功 {{ account.ok }} · 失败 {{ account.fail }}<template v-if="account.streak > 1"> · 连败 {{ account.streak }}</template></span>
               <button class="pill danger" :disabled="busy.del === account.id" @click="removeAccount(account)">删除</button>
             </div>
             <div v-if="accounts.length === 0" class="empty-state"><svg><use href="#i-server"/></svg><h2>号池为空</h2><p>用 grok2api 的导出脚本生成 accounts.json，或在上方批量导入 SSO。</p></div>

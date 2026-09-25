@@ -39,8 +39,10 @@ const searchConfig: SearchConfig = {
   instruction: userConfig.search?.instruction ?? "You MUST use web search (and X/Twitter search when relevant) to gather the latest, most accurate and up-to-date information before answering. Always search first, then answer based on the search results, and cite your sources in your response.",
   quietMs: userConfig.search?.quietMs ?? 5_000,
   maxMs: userConfig.search?.maxMs ?? 25_000,
-  attempts: userConfig.search?.attempts ?? 3,
-  firstProgressMs: userConfig.search?.firstProgressMs ?? 8_000,
+  // 换号重试：不成功不罢休（号池耗尽 / 次数上限 / 预算用尽才失败）
+  maxAttempts: userConfig.search?.maxAttempts ?? 12,
+  retryBudgetMs: userConfig.search?.retryBudgetMs ?? 150_000,
+  firstProgressMs: userConfig.search?.firstProgressMs ?? 10_000,
   snippetMaxChars: snippetMax,
   maxPages: userConfig.search?.maxPages ?? 40,
   maxPosts: userConfig.search?.maxPosts ?? 20,
@@ -58,12 +60,12 @@ const clearance = new Clearance(config.flareSolverrUrl, config.clearanceTtlMs);
 const searcher = new Searcher(pool, clearance, searchConfig);
 if (config.clientKeys.length === 0) log("warn", "client_keys_empty", { hint: "config.json 的 clientKeys 为空，/v1/* 将全部返回 401" });
 if (!config.panel.pass) log("warn", "panel_password_empty", { hint: "config.json 的 panel.pass 为空，面板将无法登录" });
-log("info", "started", { port: config.port, accounts: pool.stats().total, quietMs: searchConfig.quietMs, attempts: searchConfig.attempts });
+log("info", "started", { port: config.port, accounts: pool.stats().total, quietMs: searchConfig.quietMs, maxAttempts: searchConfig.maxAttempts, retryBudgetMs: searchConfig.retryBudgetMs });
 
 const PUBLIC_MODEL = "grok-search";
 const WEB_DIR = resolve(import.meta.dir, "../web");
 const snapshot = () => ({
-  status: { uptimeSec: Math.floor(process.uptime()), accounts: pool.stats(), clearance: clearance.status(), search: { quietMs: searchConfig.quietMs, maxMs: searchConfig.maxMs, attempts: searchConfig.attempts }, model: PUBLIC_MODEL },
+  status: { uptimeSec: Math.floor(process.uptime()), accounts: pool.stats(), clearance: clearance.status(), search: { quietMs: searchConfig.quietMs, maxMs: searchConfig.maxMs, maxAttempts: searchConfig.maxAttempts, retryBudgetMs: searchConfig.retryBudgetMs }, model: PUBLIC_MODEL },
   accounts: pool.list(),
   // SSE 只推最新 20 条；历史用 /admin/logs 分页拉取（面板滚动加载）
   logs: getLogs(undefined, 20),

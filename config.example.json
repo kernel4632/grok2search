@@ -16,15 +16,16 @@
     "sessionModel": "fast"
   },
   "search": {
-    "//": "attempts=失败换号次数; quietMs=搜索静默收工; maxMs=单路硬超时",
-    "attempts": 3,
+    "//": "maxAttempts=单请求最多换号数; retryBudgetMs=单请求重试总预算; quietMs=搜索静默收工; maxMs=单路硬超时",
     "quietMs": 4000,
     "maxMs": 18000,
     "snippetMaxChars": 500,
     "maxPages": 40,
     "maxPosts": 20,
     "instruction": "You MUST use web search (and X/Twitter search when relevant) to gather the latest, most accurate and up-to-date information before answering. Always search first, then answer based on the search results, and cite your sources in your response.",
-    "firstProgressMs": 8000
+    "firstProgressMs": 10000,
+    "maxAttempts": 12,
+    "retryBudgetMs": 150000
   },
   "cooldownMs": 60000,
   "clearanceTtlMs": 600000

@@ -132,10 +132,11 @@ curl http://127.0.0.1:46328/v1/chat/completions \
 | `flareSolverrUrl` | `http://flaresolverr:8191/v1` | 清关地址（compose 内置服务名） |
 | `upstream.baseUrl` | `https://grok.com` | 上游站点 |
 | `upstream.sessionModel` | `fast` | **上游内部模型代号**（不是 grok-chat-fast） |
-| `search.attempts` | 3 | 失败换号次数（无并发竞速，单路 + 顺序重试） |
+| `search.maxAttempts` | 12 | 单请求最多换号数（换号重试直到成功；号池耗尽才失败） |
+| `search.retryBudgetMs` | 150000 | 单请求重试总预算（毫秒），超时返回最后一次错误 |
 | `search.quietMs` | 4000 | 搜索静默多久算"搜完" |
 | `search.maxMs` | 18000 | 单路硬上限 |
-| `search.firstProgressMs` | 8000 | 哑号快速让位：限时内毫无搜索进展即换号 |
+| `search.firstProgressMs` | 10000 | 哑号快速让位：限时内毫无搜索进展即换号 |
 | `search.snippetMaxChars` | 500 | 正文节选裁剪长度 |
 | `search.maxPages` / `maxPosts` | 40 / 20 | 结果条数上限 |
 | `cooldownMs` | 60000 | 失败账号冷却时长 |
