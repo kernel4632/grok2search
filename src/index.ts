@@ -17,6 +17,7 @@ import { cors } from "@elysiajs/cors";
 import { swagger } from "@elysiajs/swagger";
 
 import { Clearance, NoAccountError, Pool, Searcher, getLogs, getSearchResult, log, resolveUid, type SearchConfig } from "./grok.ts";
+import { dbStats, initDb } from "./db.ts";
 import { QuotaRefresher, QuotaStore } from "./quota.ts";
 import { toJSON, toText, streamHead, streamItem, streamTail } from "./format.ts";
 
@@ -59,8 +60,15 @@ const searchConfig: SearchConfig = {
 };
 
 // ============================================================================
-// 装配：号池 / 配额 / 清关 / 搜索器
+// 装配：落盘数据库 / 号池 / 配额 / 清关 / 搜索器
 // ============================================================================
+// 搜索记录落盘（data/search.db）：初始化失败只降级为内存模式，不影响搜索
+try {
+  initDb(resolve(config.dataDir, "search.db"));
+  log("info", "storage_ready", { file: resolve(config.dataDir, "search.db"), ...dbStats() });
+} catch (error: any) {
+  log("error", "storage_init_failed", { error: String(error?.message ?? error), hint: "搜索继续可用，但记录不会落盘" });
+}
 const quotaStore = new QuotaStore(resolve(config.dataDir, "quota.json"));
 const pool = new Pool(config.accountsFile, config.cooldownMs, quotaStore);
 pool.load();
@@ -76,7 +84,7 @@ log("info", "started", { port: config.port, accounts: pool.stats().total, quietM
 const PUBLIC_MODEL = "grok-search";
 const WEB_DIR = resolve(import.meta.dir, "../web");
 const snapshot = () => ({
-  status: { uptimeSec: Math.floor(process.uptime()), accounts: pool.stats(), clearance: clearance.status(), quota: quota.status(), search: { quietMs: searchConfig.quietMs, maxMs: searchConfig.maxMs, maxAttempts: searchConfig.maxAttempts, retryBudgetMs: searchConfig.retryBudgetMs }, model: PUBLIC_MODEL },
+  status: { uptimeSec: Math.floor(process.uptime()), accounts: pool.stats(), clearance: clearance.status(), quota: quota.status(), storage: dbStats(), search: { quietMs: searchConfig.quietMs, maxMs: searchConfig.maxMs, maxAttempts: searchConfig.maxAttempts, retryBudgetMs: searchConfig.retryBudgetMs }, model: PUBLIC_MODEL },
   accounts: pool.list(),
   // SSE 只推最新 20 条；历史用 /admin/logs 分页拉取（面板滚动加载）
   logs: getLogs(undefined, 20),

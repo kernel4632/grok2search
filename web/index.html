@@ -94,7 +94,26 @@
               <span class="summary-note">峰值 {{ perf.max }} ms · {{ status.model }} · {{ status.clearance.cached ? '清关有效' : '清关待刷新' }} · 运行 {{ uptimeText }}</span>
             </div>
           </section>
-          <div class="section-heading"><h2>最近请求</h2><span class="subtle">点击任意一条查看搜索结果 · 每 2 秒自动刷新</span></div>
+          <!-- 配额总览：fast 剩余总量 + 分布直方图（每号明细在「账号池」） -->
+          <div class="section-heading"><h2>号池配额</h2><span class="subtle">fast 模式 · 剩余 {{ quotaSummary.percent }}% · 每 6 小时全量刷新，搜索后自动更新</span></div>
+          <section class="quota-overview">
+            <div class="quota-total">
+              <div class="quota-total-head">
+                <span class="metric-label">fast 剩余总量</span>
+                <strong>{{ quotaSummary.remaining }} <span>/ {{ quotaSummary.total }}</span></strong>
+              </div>
+              <div class="quota-bar lg"><i :class="quotaLevel(quotaSummary.percent)" :style="{ width: quotaSummary.percent + '%' }"></i></div>
+              <span class="summary-note">可用 {{ quotaSummary.usable }} / {{ quotaSummary.known }} 个号 · 已耗尽 {{ quotaSummary.exhausted }} · 未知 {{ quotaSummary.unknown }} · 更新于 {{ quotaSummary.syncedText }}</span>
+            </div>
+            <div class="quota-buckets" role="img" aria-label="账号剩余额度分布">
+              <div class="bucket" v-for="bucket in quotaSummary.buckets" :key="bucket.label">
+                <span class="bucket-count">{{ bucket.count }}</span>
+                <div class="bucket-col"><i :class="bucket.level" :style="{ height: bucket.height + '%' }"></i></div>
+                <span class="bucket-label">{{ bucket.label }}</span>
+              </div>
+            </div>
+          </section>
+          <div class="section-heading"><h2>最近请求</h2><span class="subtle">点击任意一条查看搜索结果 · 已归档 {{ status.storage?.logs ?? 0 }} 条（落盘持久化） · 每 2 秒自动刷新</span></div>
           <div class="nodes">
             <div class="node-row log-row" v-for="item in logs.slice(0, 8)" :key="item.id" @click="openLog(item)">
               <span class="log-time">{{ shortTime(item.at) }}</span>
@@ -140,8 +159,16 @@
                 </span>
               </span>
               <span class="acct-quota">
-                <span v-if="account.quota?.fast" class="badge" :class="quotaClass(account.quota.fast)">fast {{ account.quota.fast.remaining }}/{{ account.quota.fast.total }}</span>
-                <span v-if="account.quota?.auto" class="badge" :class="quotaClass(account.quota.auto)">auto {{ account.quota.auto.remaining }}/{{ account.quota.auto.total }}</span>
+                <span v-if="account.quota?.fast" class="quota-chip" :title="`fast：窗口 ${Math.round(account.quota.fast.windowSeconds / 3600)} 小时，重置约 ${shortTime(new Date(account.quota.fast.resetAt).toISOString())}`">
+                  <em>fast</em>
+                  <span class="quota-track"><i :class="quotaLevel(account.quota.fast.remaining / account.quota.fast.total * 100)" :style="{ width: (account.quota.fast.remaining / account.quota.fast.total * 100) + '%' }"></i></span>
+                  <b>{{ account.quota.fast.remaining }}/{{ account.quota.fast.total }}</b>
+                </span>
+                <span v-if="account.quota?.auto" class="quota-chip" :title="`auto：窗口 ${Math.round(account.quota.auto.windowSeconds / 3600)} 小时`">
+                  <em>auto</em>
+                  <span class="quota-track"><i :class="quotaLevel(account.quota.auto.remaining / account.quota.auto.total * 100)" :style="{ width: (account.quota.auto.remaining / account.quota.auto.total * 100) + '%' }"></i></span>
+                  <b>{{ account.quota.auto.remaining }}/{{ account.quota.auto.total }}</b>
+                </span>
                 <span v-if="account.quota?.error" class="badge fail" :title="account.quota.error">额度异常</span>
                 <span v-else-if="!account.quota?.fast" class="subtle">配额未知</span>
               </span>
@@ -194,8 +221,8 @@
         <!-- ===================== 请求日志（无限滚动） ===================== -->
         <section v-show="view === 'logs'">
           <div class="list-toolbar">
-            <div class="filter-tabs"><button class="selected">已加载 {{ logs.length }} 条</button></div>
-            <div class="list-tools"><span class="subtle">实时推送 · 点击任意一条查看搜索结果</span></div>
+            <div class="filter-tabs"><button class="selected">已加载 {{ logs.length }} 条</button><button v-if="status.storage">共 {{ status.storage.logs }} 条归档 · {{ bytesText(status.storage.bytes) }}</button></div>
+            <div class="list-tools"><span class="subtle">落盘持久化 · 点击任意一条查看搜索结果</span></div>
           </div>
           <div class="nodes">
             <div class="node-row log-row" v-for="item in logs" :key="item.id" @click="openLog(item)">

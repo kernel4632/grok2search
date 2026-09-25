@@ -6,6 +6,7 @@
  */
 
 import { existsSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
+import { dbInsert, dbPage, dbReady, dbResult } from "./db.ts";
 import { streamItem, toJSON, toText } from "./format.ts";
 
 // ============================================================================
@@ -88,13 +89,14 @@ export interface SearchConfig {
 
 // ============================================================================
 // 极简日志 + 结果快照（面板数据源）
+// 优先落盘到 SQLite（db.ts，重启不丢、历史不限量）；没接数据库时退回内存。
 // ============================================================================
 
-/** 日志环形缓冲（最新在数组末尾；面板按 id 倒序分页） */
+/** 内存环形缓冲：仅在数据库不可用时兜底（最新在数组末尾；面板按 id 倒序分页） */
 export const recentLogs: LogEntry[] = [];
-/** 自增日志 id */
+/** 自增日志 id（仅内存兜底模式使用） */
 let logSeq = 0;
-/** 结果快照：logId -> { text, json }；只保留最近 N 条，避免内存膨胀 */
+/** 结果快照：logId -> { text, json }；仅内存兜底模式使用 */
 const resultStore = new Map<number, { text: string; json: unknown }>();
 const RESULT_KEEP = 300;
 
@@ -105,14 +107,18 @@ export function log(level: "info" | "warn" | "error", msg: string, fields: Recor
   else console.log(line);
 }
 
-/** 写入一条搜索日志（同时保存结果快照，供面板点击查看） */
+/** 写入一条搜索日志（落盘 + 保存结果快照，供面板点击查看历史） */
 export function recordSearch(entry: Omit<LogEntry, "id" | "at">, result?: { text: string; json: unknown }): LogEntry {
-  const full: LogEntry = { id: ++logSeq, at: new Date().toISOString(), ...entry };
+  const at = new Date().toISOString();
+  if (dbReady()) {
+    const id = dbInsert({ at, ...entry }, result);
+    return { id, at, ...entry };
+  }
+  const full: LogEntry = { id: ++logSeq, at, ...entry };
   recentLogs.push(full);
-  if (recentLogs.length > 2000) recentLogs.splice(0, recentLogs.length - 2000);
+  if (recentLogs.length > 500) recentLogs.splice(0, recentLogs.length - 500);
   if (result) {
     resultStore.set(full.id, result);
-    // 超出保留量时删掉最旧的快照
     while (resultStore.size > RESULT_KEEP) {
       const oldest = resultStore.keys().next().value;
       if (oldest === undefined) break;
@@ -124,12 +130,15 @@ export function recordSearch(entry: Omit<LogEntry, "id" | "at">, result?: { text
 
 /** 日志分页：返回 id < before 的最近 limit 条（倒序，最新在前） */
 export function getLogs(before?: number, limit = 50): LogEntry[] {
+  const count = Math.max(1, Math.min(limit, 500));
+  if (dbReady()) return dbPage(before, count);
   const filtered = before ? recentLogs.filter((item) => item.id < before) : recentLogs;
-  return filtered.slice(-Math.max(1, Math.min(limit, 500))).reverse();
+  return filtered.slice(-count).reverse();
 }
 
 /** 取某条日志的结果快照（点击日志/查看详情用） */
 export function getSearchResult(id: number): { text: string; json: unknown } | undefined {
+  if (dbReady()) return dbResult(id);
   return resultStore.get(id);
 }
 

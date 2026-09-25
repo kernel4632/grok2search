@@ -26,6 +26,7 @@ createApp({
         accounts: { total: 0, idle: 0, busy: 0, cooldown: 0, exhausted: 0 },
         clearance: { cached: false },
         quota: { running: false, progress: { done: 0, total: 0 }, lastRunAt: 0, intervalMs: 0 },
+        storage: { ready: false, logs: 0, results: 0, bytes: 0 },
         search: { quietMs: 0, maxMs: 0, maxAttempts: 0, retryBudgetMs: 0 },
         model: "grok-search",
       },
@@ -88,6 +89,37 @@ createApp({
         area: `0,${height} ` + coords.map((c) => `${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(" ") + ` 400,${height}`,
         dots: coords.filter((c) => !c.ok),
         max,
+      };
+    },
+    /** 配额总览：fast 剩余总量 + 5 档分布直方图（数据来自每个账号的 quota.fast） */
+    quotaSummary() {
+      const windows = this.accounts.map((account) => account.quota?.fast).filter((w) => w && w.total > 0);
+      const remaining = windows.reduce((sum, w) => sum + w.remaining, 0);
+      const total = windows.reduce((sum, w) => sum + w.total, 0);
+      const definitions = [
+        { label: "0%", level: "fail" },
+        { label: "1-25%", level: "fail" },
+        { label: "25-50%", level: "warn" },
+        { label: "50-75%", level: "ok" },
+        { label: "75-100%", level: "ok" },
+      ];
+      const buckets = definitions.map((definition) => ({ ...definition, count: 0 }));
+      for (const w of windows) {
+        const percent = (w.remaining / w.total) * 100;
+        const bucket = percent <= 0 ? buckets[0] : percent <= 25 ? buckets[1] : percent <= 50 ? buckets[2] : percent <= 75 ? buckets[3] : buckets[4];
+        bucket.count += 1;
+      }
+      const max = Math.max(1, ...buckets.map((b) => b.count));
+      return {
+        remaining,
+        total,
+        percent: total ? Math.round((remaining / total) * 100) : 0,
+        known: windows.length,
+        exhausted: windows.filter((w) => w.remaining <= 0).length,
+        usable: windows.filter((w) => w.remaining > 0).length,
+        unknown: this.accounts.length - windows.length,
+        syncedText: windows.length ? this.shortTime(new Date(Math.max(...windows.map((w) => w.syncedAt))).toISOString()) : "—",
+        buckets: buckets.map((b) => ({ ...b, height: (b.count / max) * 100 })),
       };
     },
   },
@@ -203,10 +235,16 @@ createApp({
       if (account.cooldownUntil > Date.now()) return `冷却 ${Math.ceil((account.cooldownUntil - Date.now()) / 1000)}s`;
       return "空闲";
     },
-    /** 配额徽章配色：>50% 绿、>0 黄、0 红 */
-    quotaClass(window) {
-      if (!window.total) return "warn";
-      return window.remaining <= 0 ? "fail" : window.remaining / window.total <= 0.5 ? "warn" : "ok";
+    /** 额度颜色分档：>50% 绿、>0 黄、0 红 */
+    quotaLevel(percent) {
+      return percent <= 0 ? "fail" : percent <= 50 ? "warn" : "ok";
+    },
+    /** 字节转可读文本（面板显示数据库占用） */
+    bytesText(bytes) {
+      if (!bytes) return "0 B";
+      if (bytes < 1024) return `${bytes} B`;
+      if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+      return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
     },
     clean(text, max = 260) {
       const value = String(text ?? "").replace(/\s+/g, " ").trim();

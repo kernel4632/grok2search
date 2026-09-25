@@ -55,6 +55,38 @@
 .perf-dot{fill:var(--oa-red)}
 .legend-line.err{background:var(--oa-red)}
 
+/* ---------- 配额可视化 ---------- */
+/* 进度条：外层轨道 + 内层填充（颜色分档 ok/warn/fail） */
+.quota-bar{position:relative;height:6px;border-radius:999px;background:var(--ai-field-bg);overflow:hidden}
+.quota-bar.lg{height:10px;border-radius:6px}
+.quota-bar i{position:absolute;inset:0 auto 0 0;border-radius:inherit;transition:width .4s ease}
+.quota-bar i.ok,.bucket-col i.ok{background:var(--oa-green)}
+.quota-bar i.warn,.bucket-col i.warn{background:#e6b450}
+.quota-bar i.fail,.bucket-col i.fail{background:var(--oa-red)}
+
+/* 概览：左侧总量 + 右侧分布直方图 */
+.quota-overview{display:grid;grid-template-columns:minmax(260px,1.2fr) 1fr;gap:26px;align-items:end;background:var(--ai-surface-container-low);border-radius:14px;padding:18px 20px;margin-bottom:26px}
+.quota-total{display:flex;flex-direction:column;gap:10px}
+.quota-total-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.quota-total-head strong{font-size:26px;font-weight:600;font-variant-numeric:tabular-nums}
+.quota-total-head strong span{font-size:13px;font-weight:400;color:var(--ai-text-secondary)}
+.quota-buckets{display:flex;align-items:flex-end;gap:14px;height:104px}
+.quota-buckets .bucket{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;height:100%}
+.quota-buckets .bucket-count{font-size:11px;font-variant-numeric:tabular-nums;color:var(--ai-text-secondary)}
+.quota-buckets .bucket-col{flex:1;width:100%;max-width:34px;display:flex;align-items:flex-end;background:var(--ai-field-bg);border-radius:6px;overflow:hidden}
+.quota-buckets .bucket-col i{width:100%;min-height:3px;border-radius:6px 6px 0 0;transition:height .4s ease}
+.quota-buckets .bucket-label{font-size:10px;color:var(--ai-text-secondary);white-space:nowrap}
+
+/* 账号行里的迷你配额条：fast / auto 各一条 */
+.quota-chip{display:inline-flex;align-items:center;gap:6px;padding:3px 8px;border-radius:999px;background:var(--ai-field-bg);font-variant-numeric:tabular-nums}
+.quota-chip em{font-style:normal;font-size:10px;color:var(--ai-text-secondary)}
+.quota-chip .quota-track{position:relative;width:52px;height:5px;border-radius:999px;background:rgba(255,255,255,.09);overflow:hidden}
+.quota-chip .quota-track i{position:absolute;inset:0 auto 0 0;border-radius:inherit;transition:width .4s ease}
+.quota-chip .quota-track i.ok{background:var(--oa-green)}
+.quota-chip .quota-track i.warn{background:#e6b450}
+.quota-chip .quota-track i.fail{background:var(--oa-red)}
+.quota-chip b{font-size:10px;font-weight:500}
+
 /* ---------- 日志无限滚动提示 ---------- */
 .load-more{text-align:center;font-size:11px;color:var(--ai-text-secondary);opacity:.75;padding:14px 0 4px}
 
@@ -114,6 +146,17 @@
 
   /* 图表在手机端占满整行（参考站 .summary-traffic{grid-column:1/-1} 已处理，这里只调高度） */
   .summary-chart{height:42px}
+
+  /* 段落标题：小屏换行时标题独占一行，说明文字另起一行，避免标题被挤成两字一行 */
+  .section-heading{flex-wrap:wrap;row-gap:6px}
+  .section-heading h2{white-space:nowrap}
+  .section-heading .subtle{flex:1 1 100%;line-height:1.5}
+
+  /* 配额总览：总量与分布图上下排布，迷你条收窄 */
+  .quota-overview{grid-template-columns:1fr;gap:18px;padding:16px}
+  .quota-total-head strong{font-size:22px}
+  .quota-buckets{height:88px;gap:10px}
+  .quota-chip .quota-track{width:40px}
 
   /* 导入框内边距收窄，避免小屏溢出 */
   .import-box{padding:12px}
