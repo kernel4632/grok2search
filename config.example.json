@@ -35,5 +35,17 @@
     "initialDelayMs": 20000,
     "concurrency": 3,
     "//": "intervalMs=全量刷新周期(毫秒,0=关闭); initialDelayMs=启动后首次刷新延迟; concurrency=刷新并发"
+  },
+  "content": {
+    "enabled": true,
+    "maxPages": 8,
+    "maxChars": 8000,
+    "textMaxChars": 4000,
+    "timeoutMs": 12000,
+    "parallel": 4,
+    "render": true,
+    "minChars": 300,
+    "budgetMs": 40000,
+    "//": "正文补全：上游只给 500 字节选，这里二次抓取前 maxPages 条整页正文；maxChars=抓取/存储上限，textMaxChars=聊天文本输出上限；render=被反爬拦截时用 FlareSolverr 渲染兜底"
   }
 }

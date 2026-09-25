@@ -19,7 +19,7 @@ import { swagger } from "@elysiajs/swagger";
 import { Clearance, NoAccountError, Pool, Searcher, getLogs, getSearchResult, log, resolveUid, type SearchConfig } from "./grok.ts";
 import { dbStats, initDb } from "./db.ts";
 import { QuotaRefresher, QuotaStore } from "./quota.ts";
-import { toJSON, toText, streamHead, streamItem, streamTail } from "./format.ts";
+import { toJSON, toText, streamHead, streamItem, streamTail, streamContent } from "./format.ts";
 
 // ============================================================================
 // 配置：读 config.json 并补默认值（容器里由 compose 挂载）
@@ -43,6 +43,8 @@ const config = {
   },
 };
 const snippetMax = userConfig.search?.snippetMaxChars ?? 500;
+/** 正文补全后单条正文在"聊天文本"输出里的截断上限（JSON 输出始终按 content.maxChars 给全） */
+const contentMax = userConfig.content?.textMaxChars ?? 4_000;
 const searchConfig: SearchConfig = {
   instruction: userConfig.search?.instruction ?? "You MUST use web search (and X/Twitter search when relevant) to gather the latest, most accurate and up-to-date information before answering. Always search first, then answer based on the search results, and cite your sources in your response.",
   quietMs: userConfig.search?.quietMs ?? 5_000,
@@ -57,6 +59,18 @@ const searchConfig: SearchConfig = {
   sessionModel: config.upstream.sessionModel,
   baseUrl: config.upstream.baseUrl,
   clearanceTtlMs: config.clearanceTtlMs,
+  // 正文补全：上游只给 500 字节选，这里把前 N 条 URL 的整页正文抓回来
+  content: {
+    enabled: userConfig.content?.enabled ?? true,
+    maxPages: userConfig.content?.maxPages ?? 8,
+    maxChars: userConfig.content?.maxChars ?? 8_000,
+    timeoutMs: userConfig.content?.timeoutMs ?? 12_000,
+    parallel: userConfig.content?.parallel ?? 4,
+    render: userConfig.content?.render ?? true,
+    minChars: userConfig.content?.minChars ?? 300,
+    budgetMs: userConfig.content?.budgetMs ?? 40_000,
+    flaresolverrUrl: config.flareSolverrUrl,
+  },
 };
 
 // ============================================================================
@@ -180,7 +194,7 @@ const app = new Elysia()
       .post("/search", async ({ body, headers, set }: any) => {
         const query = String(body?.query ?? "").trim();
         if (!query) { set.status = 400; return err("invalid_request", "query 不能为空"); }
-        try { return { object: "search_result", model: PUBLIC_MODEL, query, ...toJSON(await searcher.search(query, bearer(headers))) }; }
+        try { return { object: "search_result", model: PUBLIC_MODEL, query, ...toJSON(await searcher.search(query, bearer(headers), { content: body?.fetch_content })) }; }
         catch (error: any) { set.status = error instanceof NoAccountError ? 503 : 502; return err(error instanceof NoAccountError ? "no_account" : "upstream_failed", error.message, "server_error"); }
       }, { body: t.Object({ query: t.String() }, { additionalProperties: true }) })
       // OpenAI Chat Completions 兼容（流式=边搜边发；非流式=整理后一次返回）
@@ -192,8 +206,8 @@ const app = new Elysia()
 
         // ---- 非流式（或要求 JSON 输出）：等搜索完成，返回整理好的完整正文 ----
         if (!body?.stream || wantsJson) {
-          let data; try { data = await searcher.search(query, bearer(headers)); } catch (error: any) { set.status = error instanceof NoAccountError ? 503 : 502; return err(error instanceof NoAccountError ? "no_account" : "upstream_failed", error.message, "server_error"); }
-          const text = wantsJson ? JSON.stringify(toJSON(data), null, 2) : toText(data, query, snippetMax);
+          let data; try { data = await searcher.search(query, bearer(headers), { content: body?.fetch_content }); } catch (error: any) { set.status = error instanceof NoAccountError ? 503 : 502; return err(error instanceof NoAccountError ? "no_account" : "upstream_failed", error.message, "server_error"); }
+          const text = wantsJson ? JSON.stringify(toJSON(data), null, 2) : toText(data, query, snippetMax, contentMax);
           if (!body?.stream) return { id, object: "chat.completion", created: Math.floor(Date.now() / 1000), model: PUBLIC_MODEL, choices: [{ index: 0, message: { role: "assistant", content: text }, finish_reason: "stop" }], usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 }, search: toJSON(data) };
           // JSON + 流式：JSON 无法增量拼接，退化为搜完后切片下发
           set.headers["content-type"] = "text/event-stream; charset=utf-8";
@@ -205,10 +219,10 @@ const app = new Elysia()
           })();
         }
 
-        // ---- 真流式：搜索一边跑，结果一边推（头部立即下发，条目到达即推） ----
+        // ---- 真流式：搜索一边跑，结果一边推（头部立即下发，条目到达即推；正文补全随后到达） ----
         const channel = createChannel<string>();
         searcher
-          .search(query, bearer(headers), (chunk) => channel.push(chunk))
+          .search(query, bearer(headers), { onDelta: (chunk) => channel.push(chunk), onContent: (page, index) => channel.push(streamContent(page, index, contentMax)), content: body?.fetch_content })
           .then((data) => { channel.push(streamTail(data.pages.length, data.posts.length, data.elapsedMs ?? 0)); channel.close(); })
           .catch((error: any) => { channel.push(`\n[搜索失败：${error?.message ?? error}]\n`); channel.close(); });
 
@@ -236,8 +250,8 @@ const app = new Elysia()
 
         // ---- 非流式（或 JSON）：等搜索完成 ----
         if (!body?.stream || wantsJson) {
-          let data; try { data = await searcher.search(query, bearer(headers)); } catch (error: any) { set.status = error instanceof NoAccountError ? 503 : 502; return err(error instanceof NoAccountError ? "no_account" : "upstream_failed", error.message, "server_error"); }
-          const text = wantsJson ? JSON.stringify(toJSON(data), null, 2) : toText(data, query, snippetMax);
+          let data; try { data = await searcher.search(query, bearer(headers), { content: body?.fetch_content }); } catch (error: any) { set.status = error instanceof NoAccountError ? 503 : 502; return err(error instanceof NoAccountError ? "no_account" : "upstream_failed", error.message, "server_error"); }
+          const text = wantsJson ? JSON.stringify(toJSON(data), null, 2) : toText(data, query, snippetMax, contentMax);
           if (!body?.stream) return { id: responseId, object: "response", created_at: created, status: "completed", model: PUBLIC_MODEL, output: [{ id: messageId, type: "message", role: "assistant", status: "completed", content: [{ type: "output_text", text, annotations: [] }] }], usage, search: toJSON(data) };
           set.headers["content-type"] = "text/event-stream; charset=utf-8";
           return (async function* () {
@@ -253,10 +267,10 @@ const app = new Elysia()
           })();
         }
 
-        // ---- 真流式：边搜边发 ----
+        // ---- 真流式：边搜边发（正文补全随后到达） ----
         const channel = createChannel<string>();
         searcher
-          .search(query, bearer(headers), (chunk) => channel.push(chunk))
+          .search(query, bearer(headers), { onDelta: (chunk) => channel.push(chunk), onContent: (page, index) => channel.push(streamContent(page, index, contentMax)), content: body?.fetch_content })
           .then((data) => { channel.push(streamTail(data.pages.length, data.posts.length, data.elapsedMs ?? 0)); channel.close(); })
           .catch((error: any) => { channel.push(`\n[搜索失败：${error?.message ?? error}]\n`); channel.close(); });
 
@@ -335,7 +349,7 @@ const app = new Elysia()
       .post("/search", async ({ body, set }: any) => {
         const query = String(body?.query ?? "").trim();
         if (!query) { set.status = 400; return err("invalid_request", "query 不能为空"); }
-        try { const data = await searcher.search(query, "panel"); return { ok: true, text: toText(data, query, snippetMax), ...toJSON(data) }; }
+        try { const data = await searcher.search(query, "panel", { content: body?.fetch_content }); return { ok: true, text: toText(data, query, snippetMax, contentMax), ...toJSON(data) }; }
         catch (error: any) { set.status = 502; return err("search_failed", error.message, "server_error"); }
       }, { body: t.Object({ query: t.String() }, { additionalProperties: true }) }),
   )

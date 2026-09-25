@@ -6,6 +6,7 @@
  */
 
 import { existsSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
+import { fillContents, type ContentConfig } from "./content.ts";
 import { dbInsert, dbPage, dbReady, dbResult } from "./db.ts";
 import { streamItem, toJSON, toText } from "./format.ts";
 
@@ -20,12 +21,16 @@ export interface Account {
   sso: string;
 }
 
-/** 网页结果（snippet 是上游给的正文节选，是本项目的核心价值） */
+/** 网页结果（snippet 是上游给的 500 字节选；content 是我们二次抓取的整页正文） */
 export interface Page {
   url: string;
   title: string;
   snippet: string;
   query: string;
+  /** 正文补全结果（content.ts 抓取；没有就是不补/抓失败） */
+  content?: string;
+  /** 正文来源：direct=直连，renderer=FlareSolverr 渲染 */
+  via?: string;
 }
 
 /** X 帖子结果 */
@@ -85,6 +90,8 @@ export interface SearchConfig {
   firstProgressMs: number;
   /** 正文节选裁剪长度（存储结果快照用） */
   snippetMaxChars: number;
+  /** 正文补全配置（缺省不补） */
+  content?: ContentConfig;
 }
 
 // ============================================================================
@@ -581,9 +588,12 @@ export class Searcher {
    *   - 每个账号只试一次（tried 去重），失败账号进冷却（连续失败指数退避）；
    *   - 没有空闲账号时短暂等待（可能有账号即将结束/冷却到期），直到预算用完；
    *   - 只有"号池为空 / 全池都试过且失败 / 预算与次数上限用尽"才会抛错。
-   *  onDelta：可选增量回调——流式接口用它实现"边搜边发"（每收集到一条结果立即回调）。
+   * hooks：
+   *   - onDelta：流式增量回调——每收集到一条搜索结果立即下发；
+   *   - onContent：正文补全回调——每条 URL 抓完整页正文后下发（比搜索帧晚到）；
+   *   - content：本次请求是否补全正文（默认取配置；false 强制关闭，true 强制开启）。
    */
-  async search(query: string, caller: string, onDelta?: (chunk: string) => void): Promise<SearchData> {
+  async search(query: string, caller: string, hooks?: { onDelta?: (chunk: string) => void; onContent?: (page: Page & { content: string }, index: number) => void; content?: boolean }): Promise<SearchData> {
     const startedAt = Date.now();
     const tried = new Set<string>(); // 本次请求已尝试过的账号 uid
     let lastError: Error | undefined;
@@ -591,11 +601,11 @@ export class Searcher {
     // 流式跨尝试去重：某一路失败换号后，已经下发过的结果不重复发
     const streamed = new Set<string>();
     let streamIndex = 0;
-    const emit = onDelta
+    const emit = hooks?.onDelta
       ? (kind: "page" | "post", item: Page | Post) => {
           if (streamed.has(item.url)) return;
           streamed.add(item.url);
-          onDelta(streamItem(kind, item, ++streamIndex, this.config.snippetMaxChars));
+          hooks.onDelta!(streamItem(kind, item, ++streamIndex, this.config.snippetMaxChars));
         }
       : undefined;
 
@@ -620,14 +630,23 @@ export class Searcher {
       tried.add(account.uid);
       try {
         const data = await collectSession(account, query, this.config, this.clearance, () => crypto.randomUUID(), new AbortController().signal, emit);
+
+        // ---- 正文补全：上游只给 500 字节选，这里把前 N 条 URL 的整页正文抓回来 ----
+        const contentConfig = this.config.content;
+        const wantContent = hooks?.content ?? contentConfig?.enabled ?? false;
+        if (wantContent && contentConfig && data.pages.length > 0) {
+          const material = await this.clearance.get();
+          await fillContents(data.pages, material.ua, contentConfig, (page, index) => hooks?.onContent?.(page as Page & { content: string }, index));
+        }
+
         this.pool.release(account, true);
         this.onAttempt?.(account);
         // 存日志 + 结果快照（面板里点这条日志就能看到完整搜索结果）
         const entry = recordSearch(
           { caller, query, accountId: account.id, pages: data.pages.length, posts: data.posts.length, firstResultMs: data.firstResultMs, elapsedMs: data.elapsedMs ?? Date.now() - startedAt, ok: true },
-          { text: toText(data, query, this.config.snippetMaxChars), json: toJSON(data) },
+          { text: toText(data, query, this.config.snippetMaxChars, this.config.content?.maxChars ?? 4_000), json: toJSON(data) },
         );
-        log("info", "search", { logId: entry.id, caller, query, accountId: account.id, attempts: tried.size, pages: data.pages.length, posts: data.posts.length, firstResultMs: data.firstResultMs, elapsedMs: Date.now() - startedAt, ok: true });
+        log("info", "search", { logId: entry.id, caller, query, accountId: account.id, attempts: tried.size, pages: data.pages.length, posts: data.posts.length, contents: data.pages.filter((p) => p.content).length, firstResultMs: data.firstResultMs, elapsedMs: Date.now() - startedAt, ok: true });
         return data;
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));

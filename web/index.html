@@ -203,7 +203,7 @@
               <div class="result-item" v-for="page in test.result.pages" :key="page.url" @click="openItem('page', page)">
                 <span class="result-title">{{ page.title || page.url }}</span>
                 <p class="result-summary">{{ clean(page.snippet, 260) }}</p>
-                <span class="result-meta">{{ host(page.url) }} · 搜索词：{{ page.query || '—' }}</span>
+                <span class="result-meta">{{ host(page.url) }} · 搜索词：{{ page.query || '—' }}<template v-if="page.content"> · 正文 {{ page.content.length }} 字</template></span>
               </div>
             </div>
             <div class="section-heading" v-if="test.result.posts.length"><h2>X 讨论（{{ test.result.posts.length }}）</h2></div>
@@ -258,6 +258,10 @@
           <!-- 单条内容详情（搜索测试点进来的） -->
           <template v-if="detail.item">
             <p class="detail-body">{{ detail.item.snippet || detail.item.text }}</p>
+            <template v-if="detail.item.content">
+              <p class="detail-subtitle">完整正文 · {{ detail.item.content.length }} 字 · {{ detail.item.via === 'renderer' ? '渲染抓取' : '直连抓取' }}</p>
+              <p class="detail-body">{{ detail.item.content }}</p>
+            </template>
             <div class="detail-actions">
               <a class="pill primary" :href="detail.item.url" target="_blank" rel="noreferrer">打开原文</a>
             </div>

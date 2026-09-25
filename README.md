@@ -145,6 +145,12 @@ curl http://127.0.0.1:46328/v1/chat/completions \
 | `quota.intervalMs` | 21600000 | 账号配额全量刷新周期（6 小时；0=只手动/顺带刷新） |
 | `quota.concurrency` | 3 | 配额刷新并发（带 120ms 限速，避免打爆上游） |
 | `dataDir` | data | 运行数据目录（`search.db` 搜索记录 + `quota.json` 配额缓存） |
+| `content.enabled` | true | 正文补全：上游每条只给 500 字符，开启后二次抓取整页正文 |
+| `content.maxPages` | 8 | 最多补全前 N 条网页（其余保留上游 500 字节选） |
+| `content.maxChars` | 8000 | 单条正文抓取/存储上限（字符） |
+| `content.textMaxChars` | 4000 | 单条正文在聊天文本输出里的上限（JSON 输出不受限） |
+| `content.parallel` / `budgetMs` | 4 / 40000 | 抓取并发 / 总时间预算（超时未抓的放弃） |
+| `content.render` | true | 被 403/Cloudflare 拦截时用 FlareSolverr 真浏览器兜底 |
 | `search.snippetMaxChars` | 500 | 正文节选裁剪长度 |
 | `search.maxPages` / `maxPosts` | 40 / 20 | 结果条数上限 |
 | `cooldownMs` | 60000 | 失败账号冷却时长 |

@@ -22,12 +22,24 @@ function clean(text: string, max: number): string {
   return value.length > max ? `${value.slice(0, max)}…` : value;
 }
 
+/** 清洗整页正文：保留段落换行（正文很长，压成一行就没法读），只收拾零宽字符与连续空行 */
+function cleanBody(text: string, max: number): string {
+  const value = (text ?? "")
+    .replace(/\r/g, "")
+    .replace(/\u200b|\ufeff/g, "")
+    .replace(/^#{1,6}\s*/gm, "")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  return value.length > max ? `${value.slice(0, max)}…` : value;
+}
+
 /**
  * 把搜索结果整理成可读正文：
  *   开头给统计与用户问题，随后按来源逐条列出「标题 + 摘要 + 链接」，
  *   X 讨论单独成段。整体形态接近一个整理好的回答，而不是原始 JSON。
  */
-export function toText(data: SearchData, query: string, snippetMax: number): string {
+export function toText(data: SearchData, query: string, snippetMax: number, contentMax = 4_000): string {
   const lines: string[] = [`「${query}」搜索结果（网页 ${data.pages.length} 条，X 帖子 ${data.posts.length} 条）`];
 
   if (data.pages.length > 0) {
@@ -36,6 +48,10 @@ export function toText(data: SearchData, query: string, snippetMax: number): str
       lines.push("", `${index + 1}. ${page.title || page.url}`);
       const snippet = clean(page.snippet, snippetMax);
       if (snippet) lines.push(`   ${snippet}`);
+      if (page.content) {
+        lines.push("   ——— 完整正文 ———");
+        lines.push(cleanBody(page.content, contentMax));
+      }
       lines.push(`   🔗 ${page.url}`);
     });
   }
@@ -58,7 +74,7 @@ export function toText(data: SearchData, query: string, snippetMax: number): str
 export function toJSON(data: SearchData) {
   return {
     queries: data.queries,
-    pages: data.pages.map((p) => ({ title: p.title, url: p.url, snippet: p.snippet, query: p.query })),
+    pages: data.pages.map((p) => ({ title: p.title, url: p.url, snippet: p.snippet, content: p.content ?? null, via: p.via ?? null, query: p.query })),
     posts: data.posts.map((p) => ({ handle: p.handle, name: p.name, text: p.text, createdAt: p.createdAt, views: p.views ?? null, likes: p.likes ?? null, url: p.url, query: p.query })),
     elapsedMs: data.elapsedMs ?? null,
   };
@@ -91,4 +107,15 @@ export function streamItem(kind: "page" | "post", item: { url: string; title?: s
 /** 流式收尾（搜索结束时的统计行） */
 export function streamTail(pages: number, posts: number, elapsedMs: number): string {
   return `——— 完成：共 ${pages} 网页 / ${posts} 帖子，用时 ${elapsedMs} ms\n`;
+}
+
+/**
+ * 流式正文补全块：搜索帧先到（当时只有 500 字节选），整页正文是随后抓到的，
+ * 所以这里单独发一段"补全正文"，带上序号/标题/链接，保证块内容自洽。
+ */
+export function streamContent(page: { url: string; title?: string; content: string; via?: string }, index: number, maxChars: number): string {
+  const title = (page.title ?? "").trim() || page.url;
+  const body = cleanBody(page.content, maxChars);
+  const source = page.via === "renderer" ? "渲染抓取" : "直连抓取";
+  return [`【正文补全 ${index}】${title}（${source}）`, body, `   🔗 ${page.url}`, ""].join("\n") + "\n";
 }
