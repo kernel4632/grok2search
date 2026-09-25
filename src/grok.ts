@@ -6,7 +6,7 @@
  */
 
 import { existsSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
-import { toJSON, toText } from "./format.ts";
+import { streamItem, toJSON, toText } from "./format.ts";
 
 // ============================================================================
 // 类型
@@ -378,8 +378,9 @@ export function parseFrame(event: any, state: FrameState): FrameEvent | null {
 
 export class SessionError extends Error {}
 
-/** 采集一路会话的搜索结果；失败抛 SessionError（由 Searcher 决定是否换号重试） */
-export function collectSession(account: Account, query: string, config: SearchConfig, clearance: Clearance, callId: () => string, signal: AbortSignal): Promise<SearchData> {
+/** 采集一路会话的搜索结果；失败抛 SessionError（由 Searcher 决定是否换号重试）。
+ *  emit：可选增量回调——每收集到一条新结果立即回调（供流式接口边搜边发）。 */
+export function collectSession(account: Account, query: string, config: SearchConfig, clearance: Clearance, callId: () => string, signal: AbortSignal, emit?: (kind: "page" | "post", item: Page | Post) => void): Promise<SearchData> {
   return new Promise((resolve, reject) => {
     const startedAt = Date.now();
     const data: SearchData = { queries: [], pages: [], posts: [] };
@@ -497,8 +498,8 @@ export function collectSession(account: Account, query: string, config: SearchCo
             return bump();
           }
           const q = queryByCall.get(parsed.callId) ?? data.queries.at(-1) ?? "";
-          if (parsed.type === "pages") for (const page of parsed.pages) { if (seenPage.has(page.url)) continue; seenPage.add(page.url); data.pages.push({ ...page, query: q }); }
-          if (parsed.type === "posts") for (const post of parsed.posts) { if (seenPost.has(post.url)) continue; seenPost.add(post.url); data.posts.push({ ...post, query: q }); }
+          if (parsed.type === "pages") for (const page of parsed.pages) { if (seenPage.has(page.url)) continue; seenPage.add(page.url); const item = { ...page, query: q }; data.pages.push(item); emit?.("page", item); }
+          if (parsed.type === "posts") for (const post of parsed.posts) { if (seenPost.has(post.url)) continue; seenPost.add(post.url); const item = { ...post, query: q }; data.posts.push(item); emit?.("post", item); }
           // 记录首个搜索结果的到达时间（面板"首字"指标，衡量搜索链路快慢）
           if (data.firstResultMs === undefined) data.firstResultMs = Date.now() - startedAt;
           clearTimeout(firstProgressTimer);
@@ -522,15 +523,26 @@ export class Searcher {
     private config: SearchConfig,
   ) {}
 
-  /** 搜索一次：按 attempts 换号重试（不等总结，正常 3~18 秒返回） */
-  async search(query: string, caller: string): Promise<SearchData> {
+  /** 搜索一次：按 attempts 换号重试（不等总结，正常 3~18 秒返回）
+   *  onDelta：可选增量回调——流式接口用它实现"边搜边发"（每收集到一条结果立即回调）。 */
+  async search(query: string, caller: string, onDelta?: (chunk: string) => void): Promise<SearchData> {
     const startedAt = Date.now();
     let lastError: Error | undefined;
+    // 流式跨尝试去重：某一路失败换号后，已经下发过的结果不重复发
+    const streamed = new Set<string>();
+    let streamIndex = 0;
+    const emit = onDelta
+      ? (kind: "page" | "post", item: Page | Post) => {
+          if (streamed.has(item.url)) return;
+          streamed.add(item.url);
+          onDelta(streamItem(kind, item, ++streamIndex, this.config.snippetMaxChars));
+        }
+      : undefined;
     for (let attempt = 0; attempt < this.config.attempts; attempt++) {
       const account = this.pool.acquire();
       if (!account) throw new NoAccountError("号池无可用账号");
       try {
-        const data = await collectSession(account, query, this.config, this.clearance, () => crypto.randomUUID(), new AbortController().signal);
+        const data = await collectSession(account, query, this.config, this.clearance, () => crypto.randomUUID(), new AbortController().signal, emit);
         this.pool.release(account, true);
         // 存日志 + 结果快照（面板里点这条日志就能看到完整搜索结果）
         const entry = recordSearch(

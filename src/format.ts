@@ -63,3 +63,32 @@ export function toJSON(data: SearchData) {
     elapsedMs: data.elapsedMs ?? null,
   };
 }
+
+// ============================================================================
+// 流式输出：搜索过程中边到边发
+// ============================================================================
+
+/** 流式头部（响应开始立即下发，客户端马上能看到"正在搜"） */
+export function streamHead(query: string): string {
+  return `「${query}」实时搜索结果\n\n`;
+}
+
+/**
+ * 流式单条：每到达一条新结果就格式化一段增量文本。
+ * 与最终 toText 的差别：不做分节标题（网页/帖子可能交错到达），用类型前缀区分。
+ */
+export function streamItem(kind: "page" | "post", item: { url: string; title?: string; snippet?: string; handle?: string; name?: string; text?: string; createdAt?: string; views?: number; likes?: number }, index: number, snippetMax: number): string {
+  if (kind === "page") {
+    const title = (item.title ?? "").trim() || item.url;
+    const snippet = clean(item.snippet ?? "", snippetMax);
+    return [`${index}. 网页 · [${title}](${item.url})`, snippet ? `   ${snippet}` : "", ""].filter(Boolean).join("\n") + "\n";
+  }
+  const meta = [item.createdAt, item.views != null ? `${item.views} 浏览` : "", item.likes != null ? `${item.likes} 赞` : ""].filter(Boolean).join(" · ");
+  const text = clean(item.text ?? "", snippetMax);
+  return [`${index}. 帖子 · @${item.handle}${item.name && item.name !== item.handle ? `（${item.name}）` : ""}${meta ? ` · ${meta}` : ""}`, `   ${text}`, `   🔗 ${item.url}`, ""].join("\n") + "\n";
+}
+
+/** 流式收尾（搜索结束时的统计行） */
+export function streamTail(pages: number, posts: number, elapsedMs: number): string {
+  return `——— 完成：共 ${pages} 网页 / ${posts} 帖子，用时 ${elapsedMs} ms\n`;
+}

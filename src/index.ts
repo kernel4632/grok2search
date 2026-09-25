@@ -17,7 +17,7 @@ import { cors } from "@elysiajs/cors";
 import { swagger } from "@elysiajs/swagger";
 
 import { Clearance, NoAccountError, Pool, Searcher, getLogs, getSearchResult, log, resolveUid, type SearchConfig } from "./grok.ts";
-import { toJSON, toText } from "./format.ts";
+import { toJSON, toText, streamHead, streamItem, streamTail } from "./format.ts";
 
 // ============================================================================
 // 配置：读 config.json 并补默认值（容器里由 compose 挂载）
@@ -112,7 +112,33 @@ function slice(text: string, size = 240): string[] {
   }
   return chunks;
 }
+/** 根据请求体提取用户问题（见下方 extractQuery）后，这里放一些小工具 */
 const chatChunk = (id: string, delta: Record<string, unknown>, finish: string | null = null) => ({ id, object: "chat.completion.chunk", created: Math.floor(Date.now() / 1000), model: PUBLIC_MODEL, choices: [{ index: 0, delta, finish_reason: finish }] });
+
+/**
+ * 极简异步通道：搜索线程 push 增量片段，SSE 生成器 await 消费。
+ * 这是"真流式"的关键——搜索结果一到就推给客户端，而不是等全部搜完再切片。
+ */
+function createChannel<T>() {
+  const queue: T[] = [];
+  let waiter: ((value: T | null) => void) | null = null;
+  let closed = false;
+  return {
+    push(value: T) {
+      if (waiter) { const resolve = waiter; waiter = null; resolve(value); }
+      else queue.push(value);
+    },
+    close() {
+      closed = true;
+      if (waiter) { const resolve = waiter; waiter = null; resolve(null); }
+    },
+    async next(): Promise<T | null> {
+      if (queue.length > 0) return queue.shift()!;
+      if (closed) return null;
+      return await new Promise((resolve) => (waiter = resolve));
+    },
+  };
+}
 
 // ============================================================================
 // Elysia 应用
@@ -136,43 +162,101 @@ const app = new Elysia()
         try { return { object: "search_result", model: PUBLIC_MODEL, query, ...toJSON(await searcher.search(query, bearer(headers))) }; }
         catch (error: any) { set.status = error instanceof NoAccountError ? 503 : 502; return err(error instanceof NoAccountError ? "no_account" : "upstream_failed", error.message, "server_error"); }
       }, { body: t.Object({ query: t.String() }, { additionalProperties: true }) })
-      // OpenAI Chat Completions 兼容
+      // OpenAI Chat Completions 兼容（流式=边搜边发；非流式=整理后一次返回）
       .post("/chat/completions", async ({ body, headers, set }: any) => {
         const query = extractQuery(body, "chat");
         if (!query) { set.status = 400; return err("invalid_request", "messages 为空"); }
-        let data; try { data = await searcher.search(query, bearer(headers)); } catch (error: any) { set.status = error instanceof NoAccountError ? 503 : 502; return err(error instanceof NoAccountError ? "no_account" : "upstream_failed", error.message, "server_error"); }
-        const text = body?.search_format === "json" ? JSON.stringify(toJSON(data), null, 2) : toText(data, query, snippetMax);
         const id = `chatcmpl-${crypto.randomUUID().replace(/-/g, "")}`;
-        if (!body?.stream) return { id, object: "chat.completion", created: Math.floor(Date.now() / 1000), model: PUBLIC_MODEL, choices: [{ index: 0, message: { role: "assistant", content: text }, finish_reason: "stop" }], usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 }, search: toJSON(data) };
+        const wantsJson = body?.search_format === "json";
+
+        // ---- 非流式（或要求 JSON 输出）：等搜索完成，返回整理好的完整正文 ----
+        if (!body?.stream || wantsJson) {
+          let data; try { data = await searcher.search(query, bearer(headers)); } catch (error: any) { set.status = error instanceof NoAccountError ? 503 : 502; return err(error instanceof NoAccountError ? "no_account" : "upstream_failed", error.message, "server_error"); }
+          const text = wantsJson ? JSON.stringify(toJSON(data), null, 2) : toText(data, query, snippetMax);
+          if (!body?.stream) return { id, object: "chat.completion", created: Math.floor(Date.now() / 1000), model: PUBLIC_MODEL, choices: [{ index: 0, message: { role: "assistant", content: text }, finish_reason: "stop" }], usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 }, search: toJSON(data) };
+          // JSON + 流式：JSON 无法增量拼接，退化为搜完后切片下发
+          set.headers["content-type"] = "text/event-stream; charset=utf-8";
+          return (async function* () {
+            yield sse({ data: chatChunk(id, { role: "assistant", content: "" }) });
+            for (const piece of slice(text, 480)) yield sse({ data: chatChunk(id, { content: piece }) });
+            yield sse({ data: chatChunk(id, {}, "stop") });
+            yield sse("[DONE]");
+          })();
+        }
+
+        // ---- 真流式：搜索一边跑，结果一边推（头部立即下发，条目到达即推） ----
+        const channel = createChannel<string>();
+        searcher
+          .search(query, bearer(headers), (chunk) => channel.push(chunk))
+          .then((data) => { channel.push(streamTail(data.pages.length, data.posts.length, data.elapsedMs ?? 0)); channel.close(); })
+          .catch((error: any) => { channel.push(`\n[搜索失败：${error?.message ?? error}]\n`); channel.close(); });
+
         set.headers["content-type"] = "text/event-stream; charset=utf-8";
         return (async function* () {
-          yield sse({ data: chatChunk(id, { role: "assistant", content: "" }) });
-          for (const piece of slice(text)) yield sse({ data: chatChunk(id, { content: piece }) });
+          yield sse({ data: chatChunk(id, { role: "assistant", content: streamHead(query) }) });
+          while (true) {
+            const piece = await channel.next();
+            if (piece === null) break;
+            yield sse({ data: chatChunk(id, { content: piece }) });
+          }
           yield sse({ data: chatChunk(id, {}, "stop") });
           yield sse("[DONE]");
         })();
       }, { body: t.Object({ messages: t.Optional(t.Array(t.Any())), stream: t.Optional(t.Boolean()), search_format: t.Optional(t.String()) }, { additionalProperties: true }) })
-      // Responses API 兼容（基础事件流）
+      // Responses API 兼容（流式=边搜边发；非流式=完整结构）
       .post("/responses", async ({ body, headers, set }: any) => {
         const query = extractQuery(body, "responses");
         if (!query) { set.status = 400; return err("invalid_request", "input 为空"); }
-        let data; try { data = await searcher.search(query, bearer(headers)); } catch (error: any) { set.status = error instanceof NoAccountError ? 503 : 502; return err(error instanceof NoAccountError ? "no_account" : "upstream_failed", error.message, "server_error"); }
-        const text = body?.search_format === "json" ? JSON.stringify(toJSON(data), null, 2) : toText(data, query, snippetMax);
         const responseId = `resp_${crypto.randomUUID().replace(/-/g, "")}`;
         const messageId = `msg_${crypto.randomUUID().replace(/-/g, "")}`;
         const created = Math.floor(Date.now() / 1000);
         const usage = { input_tokens: 0, output_tokens: 0, total_tokens: 0 };
-        if (!body?.stream) return { id: responseId, object: "response", created_at: created, status: "completed", model: PUBLIC_MODEL, output: [{ id: messageId, type: "message", role: "assistant", status: "completed", content: [{ type: "output_text", text, annotations: [] }] }], usage, search: toJSON(data) };
+        const wantsJson = body?.search_format === "json";
+
+        // ---- 非流式（或 JSON）：等搜索完成 ----
+        if (!body?.stream || wantsJson) {
+          let data; try { data = await searcher.search(query, bearer(headers)); } catch (error: any) { set.status = error instanceof NoAccountError ? 503 : 502; return err(error instanceof NoAccountError ? "no_account" : "upstream_failed", error.message, "server_error"); }
+          const text = wantsJson ? JSON.stringify(toJSON(data), null, 2) : toText(data, query, snippetMax);
+          if (!body?.stream) return { id: responseId, object: "response", created_at: created, status: "completed", model: PUBLIC_MODEL, output: [{ id: messageId, type: "message", role: "assistant", status: "completed", content: [{ type: "output_text", text, annotations: [] }] }], usage, search: toJSON(data) };
+          set.headers["content-type"] = "text/event-stream; charset=utf-8";
+          return (async function* () {
+            const send = (type: string, payload: Record<string, unknown>) => sse({ event: type, data: { type, ...payload } });
+            yield send("response.created", { response: { id: responseId, object: "response", created_at: created, status: "in_progress", model: PUBLIC_MODEL } });
+            yield send("response.output_item.added", { output_index: 0, item: { id: messageId, type: "message", role: "assistant", status: "in_progress", content: [] } });
+            yield send("response.content_part.added", { item_id: messageId, output_index: 0, content_index: 0, part: { type: "output_text", text: "" } });
+            for (const piece of slice(text, 480)) yield send("response.output_text.delta", { item_id: messageId, output_index: 0, content_index: 0, delta: piece });
+            yield send("response.output_text.done", { item_id: messageId, output_index: 0, content_index: 0, text });
+            yield send("response.content_part.done", { item_id: messageId, output_index: 0, content_index: 0, part: { type: "output_text", text } });
+            yield send("response.output_item.done", { output_index: 0, item: { id: messageId, type: "message", role: "assistant", status: "completed", content: [{ type: "output_text", text, annotations: [] }] } });
+            yield send("response.completed", { response: { id: responseId, object: "response", created_at: created, status: "completed", model: PUBLIC_MODEL, output: [], usage } });
+          })();
+        }
+
+        // ---- 真流式：边搜边发 ----
+        const channel = createChannel<string>();
+        searcher
+          .search(query, bearer(headers), (chunk) => channel.push(chunk))
+          .then((data) => { channel.push(streamTail(data.pages.length, data.posts.length, data.elapsedMs ?? 0)); channel.close(); })
+          .catch((error: any) => { channel.push(`\n[搜索失败：${error?.message ?? error}]\n`); channel.close(); });
+
         set.headers["content-type"] = "text/event-stream; charset=utf-8";
         return (async function* () {
           const send = (type: string, payload: Record<string, unknown>) => sse({ event: type, data: { type, ...payload } });
+          const head = streamHead(query);
+          let full = head;
           yield send("response.created", { response: { id: responseId, object: "response", created_at: created, status: "in_progress", model: PUBLIC_MODEL } });
           yield send("response.output_item.added", { output_index: 0, item: { id: messageId, type: "message", role: "assistant", status: "in_progress", content: [] } });
           yield send("response.content_part.added", { item_id: messageId, output_index: 0, content_index: 0, part: { type: "output_text", text: "" } });
-          for (const piece of slice(text)) yield send("response.output_text.delta", { item_id: messageId, output_index: 0, content_index: 0, delta: piece });
-          yield send("response.output_text.done", { item_id: messageId, output_index: 0, content_index: 0, text });
-          yield send("response.content_part.done", { item_id: messageId, output_index: 0, content_index: 0, part: { type: "output_text", text } });
-          yield send("response.output_item.done", { output_index: 0, item: { id: messageId, type: "message", role: "assistant", status: "completed", content: [{ type: "output_text", text, annotations: [] }] } });
+          yield send("response.output_text.delta", { item_id: messageId, output_index: 0, content_index: 0, delta: head });
+          while (true) {
+            const piece = await channel.next();
+            if (piece === null) break;
+            full += piece;
+            yield send("response.output_text.delta", { item_id: messageId, output_index: 0, content_index: 0, delta: piece });
+          }
+          yield send("response.output_text.done", { item_id: messageId, output_index: 0, content_index: 0, text: full });
+          yield send("response.content_part.done", { item_id: messageId, output_index: 0, content_index: 0, part: { type: "output_text", text: full } });
+          yield send("response.output_item.done", { output_index: 0, item: { id: messageId, type: "message", role: "assistant", status: "completed", content: [{ type: "output_text", text: full, annotations: [] }] } });
           yield send("response.completed", { response: { id: responseId, object: "response", created_at: created, status: "completed", model: PUBLIC_MODEL, output: [], usage } });
         })();
       }, { body: t.Object({ input: t.Optional(t.Any()), instructions: t.Optional(t.String()), stream: t.Optional(t.Boolean()), search_format: t.Optional(t.String()) }, { additionalProperties: true }) }),

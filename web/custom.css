@@ -100,8 +100,13 @@
   .acct-stat{display:block;justify-self:start}
   .acct-row .pill{justify-self:end}
 
-  /* 顶部胶囊导航：4 个入口在窄屏也要单行放下（参考站文字+图标并排） */
-  .rail nav>a{white-space:nowrap;font-size:11px;padding:6px 6px;gap:5px}
+  /* 顶部胶囊导航：4 个入口必须都能看到/可滑动
+   * 参考站的 .workspace-body{overflow:hidden} 会把放不下的导航项直接裁掉，
+   * 所以这里允许导航横向滚动，并给文字加省略号兜底。 */
+  .rail nav{overflow-x:auto;scrollbar-width:none;justify-content:center}
+  .rail nav::-webkit-scrollbar{display:none}
+  .rail nav>a{flex:1 1 auto;min-width:0;white-space:nowrap;font-size:11px;padding:6px 6px;gap:5px}
+  .rail nav>a>span:not(.nav-count){overflow:hidden;text-overflow:ellipsis}
   .rail .nav-item svg{width:13px;height:13px}
 
   /* 图表在手机端占满整行（参考站 .summary-traffic{grid-column:1/-1} 已处理，这里只调高度） */
@@ -114,4 +119,11 @@
   /* 详情面板全屏时，内部列表恢复单列留白 */
   .detail-scroll{padding:12px 14px 20px}
   .detail-panel .result-list{margin-bottom:18px}
+}
+
+/* 超窄屏（≤420px）：导航进一步紧凑，保证 4 项单行放下 */
+@media(max-width:420px){
+  .rail nav>a{font-size:10px;padding:5px 4px;gap:4px}
+  .rail .nav-item svg{width:12px;height:12px}
+  .rail{padding:4px}
 }
