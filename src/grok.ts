@@ -137,6 +137,11 @@ export function getSearchResult(id: number): { text: string; json: unknown } | u
 // 号池：轮询取号、单号并发 1、失败冷却、增删落盘
 // ============================================================================
 
+/** 配额查询（quota.ts 的 QuotaStore 结构上满足；类型放在这里避免循环依赖） */
+export interface QuotaLookup {
+  get(uid: string): { fast?: { remaining: number; resetAt: number }; error?: string } | undefined;
+}
+
 export class Pool {
   private accounts: (Account & { busy: boolean; cooldownUntil: number; ok: number; fail: number; streak: number; lastError?: string })[] = [];
   private cursor = 0;
@@ -147,6 +152,7 @@ export class Pool {
   constructor(
     private file: string,
     private cooldownMs = 60_000,
+    private quota?: QuotaLookup,
   ) {}
 
   /** 载入号池（uid 去重、字段校验；空文件允许启动，可后台再添加） */
@@ -180,12 +186,23 @@ export class Pool {
   stats() {
     const now = Date.now();
     const idle = this.accounts.filter((a) => !a.busy && a.cooldownUntil <= now).length;
-    return { total: this.accounts.length, idle, busy: this.accounts.filter((a) => a.busy).length, cooldown: this.accounts.filter((a) => !a.busy && a.cooldownUntil > now).length };
+    return { total: this.accounts.length, idle, busy: this.accounts.filter((a) => a.busy).length, cooldown: this.accounts.filter((a) => !a.busy && a.cooldownUntil > now).length, exhausted: this.accounts.filter((a) => this.isExhausted(a)).length };
   }
 
-  /** 面板用列表（sso 打码，绝不外泄凭据） */
+  /** 面板用列表（sso 打码，绝不外泄凭据；附带配额快照） */
   list() {
-    return this.accounts.map(({ sso, ...rest }) => ({ ...rest, ssoMasked: `${sso.slice(0, 8)}…(${sso.length})` }));
+    return this.accounts.map(({ sso, ...rest }) => ({ ...rest, ssoMasked: `${sso.slice(0, 8)}…(${sso.length})`, quota: this.quota?.get(rest.uid) ?? null }));
+  }
+
+  /** 内部用：uid + sso 全量（配额刷新器要用真实凭据；不要对外暴露） */
+  credentials() {
+    return this.accounts.map(({ uid, sso }) => ({ uid, sso }));
+  }
+
+  /** 配额耗尽判定：fast 剩余为 0 且窗口还没重置 */
+  private isExhausted(account: Account) {
+    const fast = this.quota?.get(account.uid)?.fast;
+    return !!fast && fast.remaining <= 0 && fast.resetAt > Date.now();
   }
 
   /** 取一个空闲账号（跳过忙/冷却；轮询保证均匀） */
@@ -195,13 +212,20 @@ export class Pool {
 
   /**
    * 取一个"空闲且不在 tried 里"的账号（tried = 本次请求已经试过的 uid）。
-   * 换号重试时用它保证不重复踩同一个账号；返回 null 表示当前没有可用账号。
+   * 优先选 fast 配额还有剩余的号；全都耗尽时降级为忽略配额（可能刚好重置）。
+   * 返回 null 表示当前没有可用账号。
    */
   acquireExcept(tried: Set<string>) {
+    return this.pick(tried, true) ?? this.pick(tried, false);
+  }
+
+  /** 内部选号：respectQuota=true 时跳过配额耗尽的号 */
+  private pick(tried: Set<string>, respectQuota: boolean) {
     const now = Date.now();
     for (let i = 0; i < this.accounts.length; i++) {
       const account = this.accounts[(this.cursor + i) % this.accounts.length]!;
       if (tried.has(account.uid) || account.busy || account.cooldownUntil > now) continue;
+      if (respectQuota && this.isExhausted(account)) continue;
       account.busy = true;
       this.cursor = (this.cursor + i + 1) % this.accounts.length;
       return account;
@@ -539,6 +563,8 @@ export class Searcher {
     private pool: Pool,
     private clearance: Clearance,
     private config: SearchConfig,
+    /** 每次尝试结束（成功或失败）后的回调：index.ts 用它顺带刷新账号配额 */
+    private onAttempt?: (account: Account) => void,
   ) {}
 
   /**
@@ -586,6 +612,7 @@ export class Searcher {
       try {
         const data = await collectSession(account, query, this.config, this.clearance, () => crypto.randomUUID(), new AbortController().signal, emit);
         this.pool.release(account, true);
+        this.onAttempt?.(account);
         // 存日志 + 结果快照（面板里点这条日志就能看到完整搜索结果）
         const entry = recordSearch(
           { caller, query, accountId: account.id, pages: data.pages.length, posts: data.posts.length, firstResultMs: data.firstResultMs, elapsedMs: data.elapsedMs ?? Date.now() - startedAt, ok: true },
@@ -596,6 +623,7 @@ export class Searcher {
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
         this.pool.release(account, false, lastError.message);
+        this.onAttempt?.(account);
         // 每次换号都记一行（控制台可见），方便定位坏号与失败原因
         log("warn", "search_attempt_failed", { caller, query, accountId: account.id, attempt: tried.size, error: lastError.message });
         // 不做其他处理：循环继续换下一个号

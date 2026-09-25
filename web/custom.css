@@ -12,7 +12,8 @@
 .log-counts,.log-ms{font-size:11px;color:var(--ai-text-secondary);font-variant-numeric:tabular-nums;white-space:nowrap}
 
 /* ---------- 账号行 ---------- */
-.acct-row{grid-template-columns:minmax(180px,2fr) 64px 128px 66px;gap:14px;min-height:64px;padding:13px 18px}
+.acct-row{grid-template-columns:minmax(180px,2fr) auto 64px 128px 66px;gap:14px;min-height:64px;padding:13px 18px}
+.acct-quota{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
 .acct-state{font-size:12px;color:var(--oa-green);white-space:nowrap}
 .acct-state.dim{color:var(--ai-text-secondary)}
 .acct-stat{font-size:11px;color:var(--ai-text-secondary);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -21,6 +22,7 @@
 /* ---------- 徽标 / 按钮 ---------- */
 .badge{display:inline-block;padding:3px 9px;border-radius:999px;font-size:10px;background:var(--ai-field-bg);color:var(--ai-text-secondary)}
 .badge.ok{background:rgba(100,189,152,.15);color:var(--oa-green)}
+.badge.warn{background:rgba(230,180,80,.16);color:#e6b450}
 .badge.fail{background:rgba(235,139,139,.15);color:var(--oa-red)}
 .pill.primary{background:var(--ai-primary);color:var(--ai-primary-text)}
 .pill.primary:hover{opacity:.9}
@@ -73,13 +75,13 @@
 @media(min-width:701px) and (max-width:1200px){
   .log-row{grid-template-columns:66px minmax(150px,2.2fr) 102px 102px 56px 12px;gap:12px}
   .log-counts{display:none}
-  .acct-row{grid-template-columns:minmax(170px,2fr) 62px 120px 66px;gap:12px}
+  .acct-row{grid-template-columns:minmax(170px,2fr) auto 62px 120px 66px;gap:12px}
 }
 
 /* 平板竖向：账号行藏掉统计列 */
 @media(min-width:701px) and (max-width:960px){
   .log-row{grid-template-columns:60px minmax(130px,2fr) 96px 96px 56px 12px;gap:10px;padding:12px 14px}
-  .acct-row{grid-template-columns:minmax(150px,2fr) 60px 66px;gap:10px;padding:12px 14px}
+  .acct-row{grid-template-columns:minmax(150px,2fr) auto 60px 66px;gap:10px;padding:12px 14px}
   .acct-stat{display:none}
 }
 
@@ -93,9 +95,10 @@
   .log-result{grid-column:3;justify-self:end;align-self:center}
   .log-row .node-chevron{display:none}
 
-  /* 账号卡片：身份整行，下面一行放状态/统计/删除 */
+  /* 账号卡片：身份整行，配额整行，下面一行放状态/统计/删除 */
   .acct-row{grid-template-columns:auto 1fr auto;gap:12px;padding:16px;min-height:0;border-radius:14px}
   .acct-row .node-identity{grid-column:1/-1}
+  .acct-quota{grid-column:1/-1;justify-self:start;flex-wrap:wrap}
   .acct-state{justify-self:start}
   .acct-stat{display:block;justify-self:start}
   .acct-row .pill{justify-self:end}

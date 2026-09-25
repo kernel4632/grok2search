@@ -17,6 +17,7 @@ import { cors } from "@elysiajs/cors";
 import { swagger } from "@elysiajs/swagger";
 
 import { Clearance, NoAccountError, Pool, Searcher, getLogs, getSearchResult, log, resolveUid, type SearchConfig } from "./grok.ts";
+import { QuotaRefresher, QuotaStore } from "./quota.ts";
 import { toJSON, toText, streamHead, streamItem, streamTail } from "./format.ts";
 
 // ============================================================================
@@ -33,6 +34,12 @@ const config = {
   upstream: { baseUrl: userConfig.upstream?.baseUrl ?? "https://grok.com", sessionModel: userConfig.upstream?.sessionModel ?? "fast" },
   cooldownMs: userConfig.cooldownMs ?? 60_000,
   clearanceTtlMs: userConfig.clearanceTtlMs ?? 600_000,
+  dataDir: resolve(dirname(resolve(configPath)), userConfig.dataDir ?? "data"),
+  quota: {
+    intervalMs: userConfig.quota?.intervalMs ?? 6 * 3_600_000,
+    initialDelayMs: userConfig.quota?.initialDelayMs ?? 20_000,
+    concurrency: userConfig.quota?.concurrency ?? 3,
+  },
 };
 const snippetMax = userConfig.search?.snippetMaxChars ?? 500;
 const searchConfig: SearchConfig = {
@@ -52,20 +59,24 @@ const searchConfig: SearchConfig = {
 };
 
 // ============================================================================
-// 装配：号池 / 清关 / 搜索器
+// 装配：号池 / 配额 / 清关 / 搜索器
 // ============================================================================
-const pool = new Pool(config.accountsFile, config.cooldownMs);
+const quotaStore = new QuotaStore(resolve(config.dataDir, "quota.json"));
+const pool = new Pool(config.accountsFile, config.cooldownMs, quotaStore);
 pool.load();
 const clearance = new Clearance(config.flareSolverrUrl, config.clearanceTtlMs);
-const searcher = new Searcher(pool, clearance, searchConfig);
+// 配额刷新器：启动后全量刷一次 + 周期刷新；每次搜索结束后顺带刷新当次用到的号
+const quota = new QuotaRefresher(quotaStore, clearance, () => pool.credentials(), { baseUrl: config.upstream.baseUrl, ...config.quota });
+quota.start();
+const searcher = new Searcher(pool, clearance, searchConfig, (account) => quota.touch(account));
 if (config.clientKeys.length === 0) log("warn", "client_keys_empty", { hint: "config.json 的 clientKeys 为空，/v1/* 将全部返回 401" });
 if (!config.panel.pass) log("warn", "panel_password_empty", { hint: "config.json 的 panel.pass 为空，面板将无法登录" });
-log("info", "started", { port: config.port, accounts: pool.stats().total, quietMs: searchConfig.quietMs, maxAttempts: searchConfig.maxAttempts, retryBudgetMs: searchConfig.retryBudgetMs });
+log("info", "started", { port: config.port, accounts: pool.stats().total, quietMs: searchConfig.quietMs, maxAttempts: searchConfig.maxAttempts, retryBudgetMs: searchConfig.retryBudgetMs, quotaRefreshMs: config.quota.intervalMs });
 
 const PUBLIC_MODEL = "grok-search";
 const WEB_DIR = resolve(import.meta.dir, "../web");
 const snapshot = () => ({
-  status: { uptimeSec: Math.floor(process.uptime()), accounts: pool.stats(), clearance: clearance.status(), search: { quietMs: searchConfig.quietMs, maxMs: searchConfig.maxMs, maxAttempts: searchConfig.maxAttempts, retryBudgetMs: searchConfig.retryBudgetMs }, model: PUBLIC_MODEL },
+  status: { uptimeSec: Math.floor(process.uptime()), accounts: pool.stats(), clearance: clearance.status(), quota: quota.status(), search: { quietMs: searchConfig.quietMs, maxMs: searchConfig.maxMs, maxAttempts: searchConfig.maxAttempts, retryBudgetMs: searchConfig.retryBudgetMs }, model: PUBLIC_MODEL },
   accounts: pool.list(),
   // SSE 只推最新 20 条；历史用 /admin/logs 分页拉取（面板滚动加载）
   logs: getLogs(undefined, 20),
@@ -303,6 +314,8 @@ const app = new Elysia()
       })
       .post("/accounts/reload", () => ({ ok: true, total: (pool.load(), pool.stats().total) }))
       .post("/clearance/refresh", async () => ({ ok: true, ...(await clearance.refresh()) }))
+      // 手动触发全量配额刷新（后台跑，进度看 /admin/stream 的 status.quota）
+      .post("/quota/refresh", () => { void quota.refreshAll(); return { ok: true, total: pool.stats().total }; })
       // 日志分页：?before=<id>&limit=50（面板滚动加载历史）
       .get("/logs", ({ query }: any) => ({ logs: getLogs(query?.before ? Number(query.before) : undefined, Number(query?.limit ?? 50) || 50) }))
       // 单条日志的结果快照（点击日志查看搜索结果内容）

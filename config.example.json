@@ -28,5 +28,12 @@
     "retryBudgetMs": 150000
   },
   "cooldownMs": 60000,
-  "clearanceTtlMs": 600000
+  "clearanceTtlMs": 600000,
+  "dataDir": "data",
+  "quota": {
+    "intervalMs": 21600000,
+    "initialDelayMs": 20000,
+    "concurrency": 3,
+    "//": "intervalMs=全量刷新周期(毫秒,0=关闭); initialDelayMs=启动后首次刷新延迟; concurrency=刷新并发"
+  }
 }

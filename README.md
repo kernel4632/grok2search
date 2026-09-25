@@ -137,6 +137,9 @@ curl http://127.0.0.1:46328/v1/chat/completions \
 | `search.quietMs` | 4000 | 搜索静默多久算"搜完" |
 | `search.maxMs` | 18000 | 单路硬上限 |
 | `search.firstProgressMs` | 10000 | 哑号快速让位：限时内毫无搜索进展即换号 |
+| `quota.intervalMs` | 21600000 | 账号配额全量刷新周期（6 小时；0=只手动/顺带刷新） |
+| `quota.concurrency` | 3 | 配额刷新并发（带 120ms 限速，避免打爆上游） |
+| `dataDir` | data | 运行数据目录（`quota.json` 配额缓存落在这里） |
 | `search.snippetMaxChars` | 500 | 正文节选裁剪长度 |
 | `search.maxPages` / `maxPosts` | 40 / 20 | 结果条数上限 |
 | `cooldownMs` | 60000 | 失败账号冷却时长 |

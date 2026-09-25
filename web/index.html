@@ -112,8 +112,13 @@
         <!-- ===================== 账号池 ===================== -->
         <section v-show="view === 'accounts'">
           <div class="list-toolbar">
-            <div class="filter-tabs"><button class="selected">全部 {{ status.accounts.total }}</button><button>空闲 {{ status.accounts.idle }}</button><button>冷却 {{ status.accounts.cooldown }}</button></div>
-            <div class="list-tools"><button class="pill" @click="reloadAccounts">重新载入号池</button></div>
+            <div class="filter-tabs"><button class="selected">全部 {{ status.accounts.total }}</button><button>空闲 {{ status.accounts.idle }}</button><button>冷却 {{ status.accounts.cooldown }}</button><button v-if="status.accounts.exhausted">额度耗尽 {{ status.accounts.exhausted }}</button></div>
+            <div class="list-tools">
+              <span class="subtle" v-if="status.quota?.running">配额刷新中 {{ status.quota.progress.done }}/{{ status.quota.progress.total }}</span>
+              <span class="subtle" v-else-if="status.quota?.lastRunAt">配额更新于 {{ shortTime(new Date(status.quota.lastRunAt).toISOString()) }}</span>
+              <button class="pill" :disabled="status.quota?.running" @click="refreshQuota">{{ status.quota?.running ? '刷新中…' : '刷新配额' }}</button>
+              <button class="pill" @click="reloadAccounts">重新载入号池</button>
+            </div>
           </div>
           <!-- 批量导入：每行一个 sso，uid 自动解析（与 grok2api 的导入体验一致） -->
           <div class="import-box">
@@ -133,6 +138,12 @@
                   <strong class="node-name">{{ account.name || account.id }}</strong>
                   <span class="node-subtitle">{{ account.uid }}</span>
                 </span>
+              </span>
+              <span class="acct-quota">
+                <span v-if="account.quota?.fast" class="badge" :class="quotaClass(account.quota.fast)">fast {{ account.quota.fast.remaining }}/{{ account.quota.fast.total }}</span>
+                <span v-if="account.quota?.auto" class="badge" :class="quotaClass(account.quota.auto)">auto {{ account.quota.auto.remaining }}/{{ account.quota.auto.total }}</span>
+                <span v-if="account.quota?.error" class="badge fail" :title="account.quota.error">额度异常</span>
+                <span v-else-if="!account.quota?.fast" class="subtle">配额未知</span>
               </span>
               <span class="acct-state" :class="accountState(account) === '空闲' ? '' : 'dim'">{{ accountState(account) }}</span>
               <span class="acct-stat">成功 {{ account.ok }} · 失败 {{ account.fail }}<template v-if="account.streak > 1"> · 连败 {{ account.streak }}</template></span>

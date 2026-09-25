@@ -23,9 +23,10 @@ createApp({
       connected: false,
       status: {
         uptimeSec: 0,
-        accounts: { total: 0, idle: 0, busy: 0, cooldown: 0 },
+        accounts: { total: 0, idle: 0, busy: 0, cooldown: 0, exhausted: 0 },
         clearance: { cached: false },
-        search: { quietMs: 0, maxMs: 0, attempts: 0 },
+        quota: { running: false, progress: { done: 0, total: 0 }, lastRunAt: 0, intervalMs: 0 },
+        search: { quietMs: 0, maxMs: 0, maxAttempts: 0, retryBudgetMs: 0 },
         model: "grok-search",
       },
       accounts: [],
@@ -202,6 +203,11 @@ createApp({
       if (account.cooldownUntil > Date.now()) return `冷却 ${Math.ceil((account.cooldownUntil - Date.now()) / 1000)}s`;
       return "空闲";
     },
+    /** 配额徽章配色：>50% 绿、>0 黄、0 红 */
+    quotaClass(window) {
+      if (!window.total) return "warn";
+      return window.remaining <= 0 ? "fail" : window.remaining / window.total <= 0.5 ? "warn" : "ok";
+    },
     clean(text, max = 260) {
       const value = String(text ?? "").replace(/\s+/g, " ").trim();
       return value.length > max ? `${value.slice(0, max)}…` : value;
@@ -246,6 +252,15 @@ createApp({
         this.notice = `号池已重载，共 ${result.total} 个账号`;
       } catch (error) {
         this.notice = `重载失败：${error.message}`;
+      }
+    },
+    /** 手动触发全量配额刷新（后台跑，进度由 SSE 状态推送） */
+    async refreshQuota() {
+      try {
+        const result = await this.api("admin/quota/refresh", { method: "POST" });
+        this.notice = `开始刷新配额（${result.total} 个账号），进度见上方状态`;
+      } catch (error) {
+        this.notice = `刷新失败：${error.message}`;
       }
     },
 
