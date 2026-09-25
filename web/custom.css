@@ -5,14 +5,14 @@
  * ========================================================================== */
 
 /* ---------- 日志行：时间 / 搜索词 / 结果数 / 首字 / 总计 / 状态 / 箭头 ---------- */
-.log-row{grid-template-columns:72px minmax(150px,2.4fr) 96px 108px 108px 56px 12px!important;gap:12px;min-height:52px;padding:11px 18px;cursor:pointer}
+.log-row{grid-template-columns:72px minmax(150px,2.4fr) 96px 108px 108px 56px 12px;gap:12px;min-height:52px;padding:11px 18px;cursor:pointer}
 .log-row:hover{background:var(--ai-field-bg)}
 .log-time{font-size:11px;color:var(--ai-text-secondary);font-variant-numeric:tabular-nums}
 .log-query{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .log-counts,.log-ms{font-size:11px;color:var(--ai-text-secondary);font-variant-numeric:tabular-nums;white-space:nowrap}
 
 /* ---------- 账号行 ---------- */
-.acct-row{grid-template-columns:minmax(180px,2fr) 64px 128px 66px!important;gap:14px;min-height:64px;padding:13px 18px}
+.acct-row{grid-template-columns:minmax(180px,2fr) 64px 128px 66px;gap:14px;min-height:64px;padding:13px 18px}
 .acct-state{font-size:12px;color:var(--oa-green);white-space:nowrap}
 .acct-state.dim{color:var(--ai-text-secondary)}
 .acct-stat{font-size:11px;color:var(--ai-text-secondary);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -63,10 +63,55 @@
 .detail-actions{display:flex;gap:8px;margin-top:12px}
 .detail-panel .result-item{padding:12px 14px}
 
-/* ---------- 响应式：窄屏隐藏次要列 ---------- */
-@media(max-width:960px){
-  .log-row{grid-template-columns:64px minmax(120px,2fr) 56px 12px!important}
-  .log-counts,.log-ms{display:none}
-  .acct-row{grid-template-columns:minmax(150px,2fr) 60px 66px!important}
+/* ---------- 响应式（跟随参考站断点：1200 / 960 / 700） ----------
+ * 关键点：参考站把 .node-row 在移动端变成"三列卡片"、rail 变成底部胶囊导航、
+ *        detail 面板全屏。自定义行同样是 .node-row，必须在同一断点给出对应的卡片布局，
+ *        否则会把参考站的移动端网格覆盖成挤压的桌面表格。
+ */
+
+/* 平板横向：日志行藏掉"结果数"列，保持紧凑 */
+@media(min-width:701px) and (max-width:1200px){
+  .log-row{grid-template-columns:66px minmax(150px,2.2fr) 102px 102px 56px 12px;gap:12px}
+  .log-counts{display:none}
+  .acct-row{grid-template-columns:minmax(170px,2fr) 62px 120px 66px;gap:12px}
+}
+
+/* 平板竖向：账号行藏掉统计列 */
+@media(min-width:701px) and (max-width:960px){
+  .log-row{grid-template-columns:60px minmax(130px,2fr) 96px 96px 56px 12px;gap:10px;padding:12px 14px}
+  .acct-row{grid-template-columns:minmax(150px,2fr) 60px 66px;gap:10px;padding:12px 14px}
   .acct-stat{display:none}
+}
+
+/* 手机：完全跟随参考站的卡片式布局（rail 变成顶部胶囊导航、列表变成卡片、详情全屏） */
+@media(max-width:700px){
+  /* 日志卡片：时间+状态在第一行，搜索词整行，下面三列指标，去掉箭头（整卡可点） */
+  .log-row{grid-template-columns:1fr 1fr 1fr;gap:14px 10px;padding:16px;min-height:0;border-radius:14px;position:relative}
+  .log-time{grid-column:1/3;font-size:11px;align-self:center}
+  .log-query{grid-column:1/-1;font-size:14px;font-weight:550;white-space:normal;line-height:1.45}
+  .log-counts,.log-ms{display:block;font-size:11px;white-space:normal}
+  .log-result{grid-column:3;justify-self:end;align-self:center}
+  .log-row .node-chevron{display:none}
+
+  /* 账号卡片：身份整行，下面一行放状态/统计/删除 */
+  .acct-row{grid-template-columns:auto 1fr auto;gap:12px;padding:16px;min-height:0;border-radius:14px}
+  .acct-row .node-identity{grid-column:1/-1}
+  .acct-state{justify-self:start}
+  .acct-stat{display:block;justify-self:start}
+  .acct-row .pill{justify-self:end}
+
+  /* 顶部胶囊导航：4 个入口在窄屏也要单行放下（参考站文字+图标并排） */
+  .rail nav>a{white-space:nowrap;font-size:11px;padding:6px 6px;gap:5px}
+  .rail .nav-item svg{width:13px;height:13px}
+
+  /* 图表在手机端占满整行（参考站 .summary-traffic{grid-column:1/-1} 已处理，这里只调高度） */
+  .summary-chart{height:42px}
+
+  /* 导入框内边距收窄，避免小屏溢出 */
+  .import-box{padding:12px}
+  .import-actions{flex-wrap:wrap;gap:8px}
+
+  /* 详情面板全屏时，内部列表恢复单列留白 */
+  .detail-scroll{padding:12px 14px 20px}
+  .detail-panel .result-list{margin-bottom:18px}
 }

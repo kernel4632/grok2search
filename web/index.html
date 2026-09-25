@@ -30,7 +30,7 @@
   <div class="workspace" :class="{ 'rail-collapsed': railCollapsed, 'detail-open': detail.open }">
     <!-- 顶栏 -->
     <header class="shell-header">
-      <button class="icon-button panel-toggle" aria-label="切换侧栏" @click="railCollapsed = !railCollapsed"><svg><use href="#i-menu"/></svg></button>
+      <button id="toggle-rail" class="icon-button panel-toggle" aria-label="切换侧栏" @click="railCollapsed = !railCollapsed"><svg><use href="#i-menu"/></svg></button>
       <a class="brand" href="#overview" @click.prevent="view = 'overview'">
         <svg class="brand-mark"><use href="#i-arc"/></svg><span>Grok2Search Monitor</span>
       </a>
