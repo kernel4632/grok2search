@@ -85,6 +85,12 @@ export interface SearchConfig {
   firstProgressMs: number;
   /** 正文节选裁剪长度（存储结果快照用） */
   snippetMaxChars: number;
+  /** true=grok-search 模型：等模型把总结写完，收集答案全文 */
+  waitForAnswer?: boolean;
+  /** grok-search 模型的会话最大时长（等答案写全；search 模型用 maxMs） */
+  answerMaxMs?: number;
+  /** grok-search 模型的引导词（让模型知道自己是搜索助手；缺省用 instruction） */
+  chatInstruction?: string;
 }
 
 // ============================================================================
@@ -361,7 +367,7 @@ export type FrameEvent =
   | { type: "query"; kind: "web" | "x"; callId: string; query: string }
   | { type: "pages"; callId: string; pages: Omit<Page, "query">[] }
   | { type: "posts"; callId: string; posts: Omit<Post, "query">[] }
-  | { type: "answer" }
+  | { type: "text_delta"; text: string }
   | { type: "error"; message: string };
 
 /** 把上游 event 翻译成搜索语义事件（不关心的帧返回 null） */
@@ -402,17 +408,24 @@ export function parseFrame(event: any, state: FrameState): FrameEvent | null {
     }
     return null;
   }
-  // 正文出现 = 搜索阶段结束（不等总结，立刻收工）
+  // 正文出现 = 搜索阶段结束标志（waitForAnswer=false 时用来提前收工；true 时继续收集答案文本）
   if (event?.type === "response.chunk" && event.chunk?.text?.text) {
     const channel = String(event.chunk.text.channel ?? "").toUpperCase();
-    if (!channel.includes("ANALYSIS") && !channel.includes("REASONING") && !state.answerStarted) {
+    if (!channel.includes("ANALYSIS") && !channel.includes("REASONING")) {
       state.answerStarted = true;
-      return { type: "answer" };
+      return { type: "text_delta", text: String(event.chunk.text.text) };
     }
     return null;
   }
   if ((event?.type === "response.output_text.delta" || event?.type === "response.output_text.done") && !state.answerStarted) {
-    if (event.delta || event.text) { state.answerStarted = true; return { type: "answer" }; }
+    state.answerStarted = true;
+    if (event.delta) return { type: "text_delta", text: String(event.delta) };
+    if (event.text) return { type: "text_delta", text: String(event.text) };
+    return null;
+  }
+  // 已经在答案阶段出的后续 output_text 增量
+  if ((event?.type === "response.output_text.delta" || event?.type === "response.output_text.done") && state.answerStarted) {
+    if (event.delta) return { type: "text_delta", text: String(event.delta) };
     return null;
   }
   // 上游业务错误
@@ -430,11 +443,13 @@ export function parseFrame(event: any, state: FrameState): FrameEvent | null {
 export class SessionError extends Error {}
 
 /** 采集一路会话的搜索结果；失败抛 SessionError（由 Searcher 决定是否换号重试）。
- *  emit：可选增量回调——每收集到一条新结果立即回调（供流式接口边搜边发）。 */
-export function collectSession(account: Account, query: string, config: SearchConfig, clearance: Clearance, callId: () => string, signal: AbortSignal, emit?: (kind: "page" | "post", item: Page | Post) => void): Promise<SearchData> {
+ *  hooks.onSearch：可选增量回调——每收集到一条新搜索结果立即回调（供流式接口边搜边发）。
+ *  hooks.onText：可选答案文本增量回调——仅 waitForAnswer=true 时启用（流式下发模型总结）。 */
+export function collectSession(account: Account, query: string, config: SearchConfig, clearance: Clearance, callId: () => string, signal: AbortSignal, hooks?: { onSearch?: (kind: "page" | "post", item: Page | Post) => void; onText?: (text: string) => void }): Promise<SearchData & { answer?: string }> {
   return new Promise((resolve, reject) => {
     const startedAt = Date.now();
-    const data: SearchData = { queries: [], pages: [], posts: [] };
+    const data: SearchData & { answer?: string } = { queries: [], pages: [], posts: [] };
+    const { waitForAnswer } = config;
     const queryByCall = new Map<string, string>();
     const seenPage = new Set<string>();
     const seenPost = new Set<string>();
@@ -501,8 +516,9 @@ export function collectSession(account: Account, query: string, config: SearchCo
         let attached = false;
         let turnSent = false;
 
-        /** 搜索活动重置静默计时；有结果后静默 quietMs 即收工 */
+        /** 搜索活动更新静默计时（waitForAnswer 模式下不自动收工，等 response.done） */
         const bump = () => {
+          if (waitForAnswer) return;
           clearTimeout(quietTimer);
           quietTimer = setTimeout(() => {
             if (data.pages.length + data.posts.length > 0) finish(true);
@@ -535,22 +551,30 @@ export function collectSession(account: Account, query: string, config: SearchCo
           // 握手状态机
           if (event.type === "session.created") { created = true; sessionId = sessionId || envelope.session_id || event.session?.id || ""; return sendTurn(); }
           if (event.type === "conversation.attached") { attached = true; sessionId = sessionId || event.conversation?.id || envelope.session_id || ""; return sendTurn(); }
-          if (event.type === "response.done") { done = true; return finish(data.pages.length + data.posts.length > 0, new SessionError("上游结束且无结果")); }
+          if (event.type === "response.done") {
+          done = true;
+          if (waitForAnswer) return finish(data.pages.length + data.posts.length > 0 || !!data.answer);
+          return finish(data.pages.length + data.posts.length > 0, new SessionError("上游结束且无结果"));
+        }
           if (event.type === "session.ended") { if (!done) finish(false, new SessionError("上游会话提前结束")); return; }
 
           // 搜索语义事件
           const parsed = parseFrame(event, frameState);
           if (!parsed) return;
           if (parsed.type === "error") return finish(false, new SessionError(parsed.message));
-          if (parsed.type === "answer") { if (data.pages.length + data.posts.length > 0) finish(true); return; }
+          if (parsed.type === "text_delta") {
+            data.answer = (data.answer ?? "") + parsed.text;
+            hooks?.onText?.(parsed.text);
+            return;
+          }
           if (parsed.type === "query") {
             if (parsed.query.trim()) { queryByCall.set(parsed.callId, parsed.query.trim()); if (!data.queries.includes(parsed.query.trim())) data.queries.push(parsed.query.trim()); }
             clearTimeout(firstProgressTimer); // 已有搜索进展，撤销哑号计时
             return bump();
           }
           const q = queryByCall.get(parsed.callId) ?? data.queries.at(-1) ?? "";
-          if (parsed.type === "pages") for (const page of parsed.pages) { if (seenPage.has(page.url)) continue; seenPage.add(page.url); const item = { ...page, query: q }; data.pages.push(item); emit?.("page", item); }
-          if (parsed.type === "posts") for (const post of parsed.posts) { if (seenPost.has(post.url)) continue; seenPost.add(post.url); const item = { ...post, query: q }; data.posts.push(item); emit?.("post", item); }
+          if (parsed.type === "pages") for (const page of parsed.pages) { if (seenPage.has(page.url)) continue; seenPage.add(page.url); const item = { ...page, query: q }; data.pages.push(item); hooks?.onSearch?.("page", item); }
+          if (parsed.type === "posts") for (const post of parsed.posts) { if (seenPost.has(post.url)) continue; seenPost.add(post.url); const item = { ...post, query: q }; data.posts.push(item); hooks?.onSearch?.("post", item); }
           // 记录首个搜索结果的到达时间（面板"首字"指标，衡量搜索链路快慢）
           if (data.firstResultMs === undefined) data.firstResultMs = Date.now() - startedAt;
           clearTimeout(firstProgressTimer);
@@ -584,6 +608,20 @@ export class Searcher {
    *  onDelta：可选增量回调——流式接口用它实现"边搜边发"（每收集到一条结果立即回调）。
    */
   async search(query: string, caller: string, onDelta?: (chunk: string) => void): Promise<SearchData> {
+    return this.run(query, caller, this.config, { onSearch: onDelta });
+  }
+
+  /**
+   * grok-search 模型：搜到结果后继续等模型把总结写完（答案全文）。
+   * hooks.onSearch=搜索结果增量（吐到"思考"），hooks.onText=答案文本增量（吐到正文）。
+   */
+  async chat(query: string, caller: string, hooks?: { onSearch?: (chunk: string) => void; onText?: (text: string) => void }): Promise<SearchData & { answer?: string }> {
+    const chatConfig = { ...this.config, waitForAnswer: true, maxMs: this.config.answerMaxMs ?? 120_000, instruction: this.config.chatInstruction ?? this.config.instruction };
+    return this.run(query, caller, chatConfig, { onSearch: hooks?.onSearch, onText: hooks?.onText });
+  }
+
+  /** 共用的换号重试循环（waitForAnswer 由 config 决定；返回带 answer 的结果） */
+  private async run(query: string, caller: string, config: SearchConfig, hooks: { onSearch?: (chunk: string) => void; onText?: (text: string) => void }): Promise<SearchData & { answer?: string }> {
     const startedAt = Date.now();
     const tried = new Set<string>(); // 本次请求已尝试过的账号 uid
     let lastError: Error | undefined;
@@ -591,18 +629,18 @@ export class Searcher {
     // 流式跨尝试去重：某一路失败换号后，已经下发过的结果不重复发
     const streamed = new Set<string>();
     let streamIndex = 0;
-    const emit = onDelta
+    const emit = hooks.onSearch
       ? (kind: "page" | "post", item: Page | Post) => {
           if (streamed.has(item.url)) return;
           streamed.add(item.url);
-          onDelta(streamItem(kind, item, ++streamIndex, this.config.snippetMaxChars));
+          hooks.onSearch!(streamItem(kind, item, ++streamIndex, config.snippetMaxChars));
         }
       : undefined;
 
     while (true) {
       // ---- 停止条件：次数上限 / 时间预算 ----
-      if (tried.size >= this.config.maxAttempts) break;
-      if (Date.now() - startedAt > this.config.retryBudgetMs) break;
+      if (tried.size >= config.maxAttempts) break;
+      if (Date.now() - startedAt > config.retryBudgetMs) break;
 
       // ---- 取一个"没试过且空闲"的账号 ----
       const account = this.pool.acquireExcept(tried);
@@ -619,15 +657,15 @@ export class Searcher {
 
       tried.add(account.uid);
       try {
-        const data = await collectSession(account, query, this.config, this.clearance, () => crypto.randomUUID(), new AbortController().signal, emit);
+        const data = await collectSession(account, query, config, this.clearance, () => crypto.randomUUID(), new AbortController().signal, { onSearch: emit, onText: hooks.onText });
         this.pool.release(account, true);
         this.onAttempt?.(account);
         // 存日志 + 结果快照（面板里点这条日志就能看到完整搜索结果）
         const entry = recordSearch(
           { caller, query, accountId: account.id, pages: data.pages.length, posts: data.posts.length, firstResultMs: data.firstResultMs, elapsedMs: data.elapsedMs ?? Date.now() - startedAt, ok: true },
-          { text: toText(data, query, this.config.snippetMaxChars), json: toJSON(data) },
+          { text: toText(data, query, config.snippetMaxChars), json: toJSON(data) },
         );
-        log("info", "search", { logId: entry.id, caller, query, accountId: account.id, attempts: tried.size, pages: data.pages.length, posts: data.posts.length, firstResultMs: data.firstResultMs, elapsedMs: Date.now() - startedAt, ok: true });
+        log("info", "search", { logId: entry.id, caller, query, accountId: account.id, attempts: tried.size, pages: data.pages.length, posts: data.posts.length, hasAnswer: !!data.answer, firstResultMs: data.firstResultMs, elapsedMs: Date.now() - startedAt, ok: true });
         return data;
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));

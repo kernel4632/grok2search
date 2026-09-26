@@ -23,7 +23,7 @@ describe("parseFrame（真实帧夹具）", () => {
       if (parsed.type === "query") queries.push(parsed.query);
       if (parsed.type === "pages") pages.push(...parsed.pages);
       if (parsed.type === "posts") posts.push(...parsed.posts);
-      if (parsed.type === "answer") answers++;
+      if (parsed.type === "text_delta") answers++;
     }
     return { queries, pages, posts, answers };
   };
@@ -36,7 +36,7 @@ describe("parseFrame（真实帧夹具）", () => {
     expect(pages.some((p) => p.snippet.length > 50)).toBe(true); // snippet 是本项目核心价值
     expect(posts.length).toBeGreaterThanOrEqual(5);
     expect(posts.every((p) => p.url.startsWith("https://x.com/"))).toBe(true);
-    expect(answers).toBe(1); // 正文帧只触发一次答案事件
+    expect(answers).toBe(1); // 正文帧只触发一次文本增量（本夹具只含一个正文分片）
   });
 
   test("无关帧与错误帧行为正确", () => {

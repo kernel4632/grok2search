@@ -83,11 +83,16 @@ location /groksearch/ {
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | `/v1/models` | 仅返回 `grok-search` |
+| GET | `/v1/models` | 返回两个模型：`search` 与 `grok-search` |
 | POST | `/v1/chat/completions` | OpenAI 兼容；`stream` 支持 SSE；`search_format=json` 可切结构化 |
 | POST | `/v1/responses` | Responses 兼容（基础事件流） |
 | POST | `/v1/search` | 原生结构化：`{query}` → `{queries,pages,posts}` |
 | GET | `/healthz` | 存活 + 号池概览（无认证） |
+
+**两个模型**：
+
+* `search`：只吐搜索结果（网页/帖子的标题 + 节选 + 链接 + `[[N]](url)` 引用），不等模型总结，3~18 秒出结果。
+* `grok-search`：搜索阶段的结果流式进 `reasoning_content`（chat）/ `web_search_call` 项（responses），正文吐模型自己的总结，并带 `url_citation` 引用；内置"你是一个搜索助手"引导词。
 
 ```bash
 curl http://127.0.0.1:46328/v1/chat/completions \
@@ -197,7 +202,7 @@ bun run dev          # 本地热重载（需可达的 FlareSolverr，见 config.
   仍失败检查 FlareSolverr 容器日志。
 * **搜不到结果**：查面板「请求日志」；可调大 `search.maxMs` / `search.quietMs`，
   或确认账号本身没有被上游限制。
-* **下游要"总结"**：本项目刻意不做；可用返回的 `pages/posts` 自行喂给任意模型。
+* **下游要"总结"**：`search` 模型刻意不做（只吐搜索结果）；需要总结用 `grok-search` 模型即可。
 
 ---
 
