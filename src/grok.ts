@@ -89,6 +89,8 @@ export interface SearchConfig {
   waitForAnswer?: boolean;
   /** grok-search 模型的会话最大时长（等答案写全；search 模型用 maxMs） */
   answerMaxMs?: number;
+  /** grok-search 模型：搜到结果后，若正文迟迟不开始吐，就用搜索结果兜底收工（秒） */
+  answerTimeoutMs?: number;
   /** grok-search 模型的引导词（让模型知道自己是搜索助手；缺省用 instruction） */
   chatInstruction?: string;
 }
@@ -459,9 +461,11 @@ export function collectSession(account: Account, query: string, config: SearchCo
     let quietTimer: ReturnType<typeof setTimeout> | undefined;
     let maxTimer: ReturnType<typeof setTimeout> | undefined;
     let firstProgressTimer: ReturnType<typeof setTimeout> | undefined;
+    let answerTimer: ReturnType<typeof setTimeout> | undefined;
     let heartbeat: ReturnType<typeof setInterval> | undefined;
     let done = false;
     let settled = false;
+    let gotResult = false; // 是否已收到搜索结果（用于 answer 兜底计时）
 
     /** 收工/失败统一出口（清资源、补耗时与上限、只结算一次） */
     const finish = (ok: boolean, error?: Error) => {
@@ -470,6 +474,7 @@ export function collectSession(account: Account, query: string, config: SearchCo
       clearTimeout(quietTimer);
       clearTimeout(maxTimer);
       clearTimeout(firstProgressTimer);
+      clearTimeout(answerTimer);
       clearInterval(heartbeat);
       try { ws?.close(); } catch {}
       if (ok) {
@@ -480,6 +485,13 @@ export function collectSession(account: Account, query: string, config: SearchCo
       } else {
         reject(error ?? new SessionError("未获得搜索结果"));
       }
+    };
+
+    // 总结模式兜底：搜到结果后，正文若迟迟不开始吐，用搜索结果收工（避免空 content 傻等 120s）
+    const resetAnswerTimer = () => {
+      if (!waitForAnswer || settled) return;
+      clearTimeout(answerTimer);
+      answerTimer = setTimeout(() => finish(data.pages.length + data.posts.length > 0), config.answerTimeoutMs ?? 25_000);
     };
 
     // 哑号快速失败：限时内没有任何搜索进展（连搜索词都没有）就直接换号
@@ -564,6 +576,7 @@ export function collectSession(account: Account, query: string, config: SearchCo
           if (parsed.type === "error") return finish(false, new SessionError(parsed.message));
           if (parsed.type === "text_delta") {
             data.answer = (data.answer ?? "") + parsed.text;
+            clearTimeout(answerTimer); // 正文开始吐了，撤销兜底计时
             hooks?.onText?.(parsed.text);
             return;
           }
@@ -577,6 +590,8 @@ export function collectSession(account: Account, query: string, config: SearchCo
           if (parsed.type === "posts") for (const post of parsed.posts) { if (seenPost.has(post.url)) continue; seenPost.add(post.url); const item = { ...post, query: q }; data.posts.push(item); hooks?.onSearch?.("post", item); }
           // 记录首个搜索结果的到达时间（面板"首字"指标，衡量搜索链路快慢）
           if (data.firstResultMs === undefined) data.firstResultMs = Date.now() - startedAt;
+          gotResult = true;
+          resetAnswerTimer(); // 有结果到达：重置"等正文"兜底计时
           clearTimeout(firstProgressTimer);
           bump();
         });

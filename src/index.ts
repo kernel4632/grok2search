@@ -61,6 +61,7 @@ const searchConfig: SearchConfig = {
   maxPages: userConfig.search?.maxPages ?? 40,
   maxPosts: userConfig.search?.maxPosts ?? 20,
   answerMaxMs: userConfig.search?.answerMaxMs ?? 120_000,
+  answerTimeoutMs: userConfig.search?.answerTimeoutMs ?? 25_000,
   chatInstruction: userConfig.search?.chatInstruction ?? SEARCH_INSTRUCTION,
   sessionModel: config.upstream.sessionModel,
   baseUrl: config.upstream.baseUrl,
@@ -241,7 +242,7 @@ const app = new Elysia()
         }
         const channel = createChannel<{ kind: "reasoning" | "text" | "tail"; text: string }>();
         searcher.chat(query, bearer(headers), { onSearch: (chunk) => channel.push({ kind: "reasoning", text: chunk }), onText: (t) => channel.push({ kind: "text", text: t }) })
-          .then((data) => { if (!(data.answer ?? "").trim()) channel.push({ kind: "tail", text: streamTail(data.pages.length, data.posts.length, data.elapsedMs ?? 0) }); channel.close(); })
+          .then((data) => { if (!(data.answer ?? "").trim()) channel.push({ kind: "text", text: buildAnswer(data, query, snippetMax).text }); channel.close(); })
           .catch((error: any) => { channel.push({ kind: "tail", text: `\n[搜索失败：${error?.message ?? error}]\n` }); channel.close(); });
         set.headers["content-type"] = "text/event-stream; charset=utf-8";
         return (async function* () {
