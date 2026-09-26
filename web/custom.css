@@ -1,84 +1,141 @@
 /* ============================================================================
- * custom.css —— 在参考站点样式（app.css）之上的少量补充
- * 只添加面板特有组件：日志行、账号行、导入框、图表、详情面板内容、结果列表。
- * 配色沿用 app.css 的 CSS 变量，保持整体风格一致。
+ * custom.css —— grok2search 面板补充样式
+ *
+ * 原则：
+ *   1. 尽可能全用 flex，宽度 auto / 自适应，不出现文字重叠
+ *   2. 过渡动画（hover 上浮、详情滑入、进度条渐变）
+ *   3. 大触控目标（按钮 / 输入 / nav ≥ 44px 手机端）
+ *   4. 多断点自适应（≥1200 / 701-1200 / 701-960 / ≤700 / ≤420）
  * ========================================================================== */
 
-/* ---------- 日志行：时间 / 搜索词 / 结果数 / 首字 / 总计 / 状态 / 箭头 ---------- */
-.log-row{grid-template-columns:72px minmax(150px,2.4fr) 96px 108px 108px 56px 12px;gap:12px;min-height:52px;padding:11px 18px;cursor:pointer}
+/* ==================== 共享过渡 / 触控 ==================== */
+.pill,.icon-button,.nav-item,.node-row,.result-item,button{transition:transform .15s ease,box-shadow .15s ease,background .15s ease,opacity .15s ease}
+.node-row:hover{transform:translateY(-1px);box-shadow:0 2px 8px rgba(0,0,0,.18)}
+.result-item:hover{transform:translateY(-1px);box-shadow:0 2px 6px rgba(0,0,0,.15)}
+.pill:hover{box-shadow:0 1px 4px rgba(0,0,0,.12)}
+.pill:active,button:active{transform:scale(.97)}
+.nav-item:active{transform:scale(.96)}
+
+/* ==================== 概览 ==================== */
+/* 账号状态分段条 */
+.acct-segbar{display:flex;height:8px;border-radius:999px;overflow:hidden;margin:4px 0 2px;gap:1px;background:var(--ai-field-bg)}
+.acct-segbar i{display:block;height:100%;transition:flex .4s ease}
+.acct-segbar i.idle{background:var(--oa-green)}
+.acct-segbar i.busy{background:var(--ai-primary)}
+.acct-segbar i.cool{background:#e6b450}
+.acct-segbar i.drain{background:var(--oa-red)}
+.seg-legend{display:flex;flex-wrap:wrap;gap:10px;font-size:10px;color:var(--ai-text-secondary);margin-top:3px}
+.seg-legend span{display:inline-flex;align-items:center;gap:3px}
+.seg-legend i{width:7px;height:7px;border-radius:2px;display:inline-block}
+.seg-legend i.idle{background:var(--oa-green)}
+.seg-legend i.busy{background:var(--ai-primary)}
+.seg-legend i.cool{background:#e6b450}
+.seg-legend i.drain{background:var(--oa-red)}
+
+/* 成功率环形图 */
+.ring-cell{display:flex;align-items:center;gap:10px}
+.ring{width:44px;height:44px;flex-shrink:0;transform:rotate(-90deg)}
+.ring .ring-bg{fill:none;stroke:var(--ai-field-bg);stroke-width:3}
+.ring .ring-fg{fill:none;stroke:var(--oa-green);stroke-width:3;stroke-linecap:round;transition:stroke-dashoffset .6s ease}
+.ring-center{display:flex;flex-direction:column}
+.ring-center strong{font-size:17px;font-weight:600;line-height:1.1}
+.ring-center small{font-size:10px;color:var(--ai-text-secondary)}
+
+/* 指标数字 */
+.metric-cell{display:flex;flex-direction:column;gap:2px}
+.metric-cell strong{font-size:16px;font-weight:600;line-height:1.2}
+.metric-cell small{font-size:10px;color:var(--ai-text-secondary);font-weight:400}
+
+/* ==================== 日志行（全部 flex，告别 grid 列宽重叠） ==================== */
+.log-row{display:flex;align-items:center;gap:12px;min-height:52px;padding:10px 16px;cursor:pointer;border-radius:11px;margin-bottom:2px}
 .log-row:hover{background:var(--ai-field-bg)}
-.log-time{font-size:11px;color:var(--ai-text-secondary);font-variant-numeric:tabular-nums}
-.log-query{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.log-counts,.log-ms{font-size:11px;color:var(--ai-text-secondary);font-variant-numeric:tabular-nums;white-space:nowrap}
+.log-time{font-size:11px;color:var(--ai-text-secondary);font-variant-numeric:tabular-nums;flex-shrink:0;width:52px}
+.log-query{font-size:13px;font-weight:500;flex:1 1 0;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.log-counts{font-size:11px;color:var(--ai-text-secondary);flex-shrink:0;white-space:nowrap}
+.log-counts b{color:var(--ai-text);font-weight:550}
+.log-dur{display:flex;flex-direction:column;gap:3px;flex-shrink:0;min-width:70px}
+.dur-bar{height:4px;border-radius:999px;background:var(--ai-field-bg);overflow:hidden}
+.dur-bar i{display:block;height:100%;border-radius:inherit;transition:width .4s ease}
+.dur-bar i.ok{background:var(--oa-green)}
+.dur-bar i.fail{background:var(--oa-red)}
+.log-dur b{font-size:10px;color:var(--ai-text-secondary);font-variant-numeric:tabular-nums}
+.log-result{flex-shrink:0}
+.node-chevron{flex-shrink:0;width:12px}
+.node-chevron svg{stroke:var(--ai-text-secondary)}
 
-/* ---------- 账号行 ---------- */
-.acct-row{grid-template-columns:minmax(180px,2fr) auto 64px 128px 66px;gap:14px;min-height:64px;padding:13px 18px}
-.acct-quota{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
-.acct-state{font-size:12px;color:var(--oa-green);white-space:nowrap}
+/* 首字列缩小 （原"首字 ms"列挪到 log-dur 上方？不，用 durText 简化总耗时即够。） */
+
+/* ==================== 账号行（flex） ==================== */
+.acct-row{display:flex;align-items:center;gap:14px;min-height:64px;padding:12px 16px;border-radius:11px;margin-bottom:2px}
+.acct-row .node-identity{flex:1 1 0;min-width:0}
+.acct-quota{display:inline-flex;align-items:center;gap:5px;flex-shrink:0;flex-wrap:wrap}
+.acct-state{font-size:11px;white-space:nowrap;flex-shrink:0;min-width:44px;text-align:center}
+.acct-state:not(.dim){color:var(--oa-green)}
 .acct-state.dim{color:var(--ai-text-secondary)}
-.acct-stat{font-size:11px;color:var(--ai-text-secondary);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.node-dot.off{background:var(--oa-red)}
+.acct-stat{display:flex;flex-direction:column;gap:3px;flex-shrink:0;min-width:100px;overflow:hidden}
+.stat-bar{display:flex;height:4px;border-radius:999px;overflow:hidden;gap:1px;background:var(--ai-field-bg)}
+.stat-bar i{display:block;height:100%;transition:flex .4s ease}
+.stat-bar i.ok{background:var(--oa-green)}
+.stat-bar i.fail{background:var(--oa-red)}
+.stat-text{font-size:10px;color:var(--ai-text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
-/* ---------- 徽标 / 按钮 ---------- */
-.badge{display:inline-block;padding:3px 9px;border-radius:999px;font-size:10px;background:var(--ai-field-bg);color:var(--ai-text-secondary)}
+/* ==================== 配额/徽标/按钮 ==================== */
+.badge{display:inline-flex;align-items:center;padding:4px 10px;border-radius:999px;font-size:10px;font-weight:500;background:var(--ai-field-bg);color:var(--ai-text-secondary)}
 .badge.ok{background:rgba(100,189,152,.15);color:var(--oa-green)}
 .badge.warn{background:rgba(230,180,80,.16);color:#e6b450}
 .badge.fail{background:rgba(235,139,139,.15);color:var(--oa-red)}
+.pill{display:inline-flex;align-items:center;justify-content:center;padding:8px 14px;border-radius:999px;font-size:11px;font-weight:520;line-height:1;min-height:36px;border:0;cursor:pointer;background:var(--ai-field-bg);color:var(--ai-text)}
 .pill.primary{background:var(--ai-primary);color:var(--ai-primary-text)}
 .pill.primary:hover{opacity:.9}
 .pill.danger{color:var(--oa-red)}
 .pill.danger:hover{background:rgba(235,139,139,.12)}
+.pill:disabled{opacity:.45;cursor:not-allowed;transform:none!important}
 
-/* ---------- 批量导入框 ---------- */
-.import-box{background:var(--ai-surface-container-low);border-radius:12px;padding:14px 16px;margin-bottom:18px}
-.import-box textarea{width:100%;background:var(--ai-field-bg);border:0;border-radius:11px;padding:11px 12px;color:var(--ai-text);font-size:12px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;line-height:1.7;resize:vertical}
+/* ==================== 批量导入框 ==================== */
+.import-box{background:var(--ai-surface-container-low);border-radius:12px;padding:14px 16px;margin-bottom:16px}
+.import-box textarea{width:100%;background:var(--ai-field-bg);border:0;border-radius:10px;padding:11px 12px;color:var(--ai-text);font-size:12px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;line-height:1.7;resize:vertical;min-height:80px;box-sizing:border-box}
 .import-box textarea::placeholder{color:var(--ai-text-secondary);font-family:inherit}
-.import-box textarea:focus-visible{box-shadow:0 0 0 3px var(--ai-focus-shadow)}
-.import-actions{display:flex;align-items:center;gap:12px;margin-top:10px}
+.import-box textarea:focus-visible{box-shadow:0 0 0 3px var(--ai-focus-shadow);outline:none}
+.import-actions{display:flex;align-items:center;gap:10px;margin-top:10px;flex-wrap:wrap}
 
-/* ---------- 搜索词 chips ---------- */
+/* ==================== 搜索词 chips ==================== */
 .chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:22px}
-.chip{padding:4px 10px;border-radius:999px;background:var(--ai-surface-container-high);font-size:11px;color:var(--ai-text-secondary)}
+.chip{padding:5px 11px;border-radius:999px;background:var(--ai-surface-container-high);font-size:11px;color:var(--ai-text-secondary)}
 
-/* ---------- 结果列表（搜索测试与详情面板共用，条目可点） ---------- */
-.result-list{display:flex;flex-direction:column;gap:6px;margin-bottom:26px}
+/* ==================== 结果列表 ==================== */
+.result-list{display:flex;flex-direction:column;gap:6px;margin-bottom:24px}
 .result-item{background:var(--ai-surface-container-low);border-radius:12px;padding:14px 18px;display:flex;flex-direction:column;gap:6px;cursor:pointer}
 .result-item:hover{background:var(--ai-field-bg)}
 .result-title{font-size:13px;font-weight:550;color:var(--ai-text)}
 .result-summary{font-size:12px;line-height:1.75;color:var(--ai-text-secondary);word-break:break-word}
 .result-meta{font-size:10px;color:var(--ai-text-secondary);opacity:.8;word-break:break-all}
 
-/* ---------- 概览图表 ---------- */
+/* ==================== 概览图表 ==================== */
 .perf-baseline{stroke:var(--ai-border);stroke-width:.8}
 .perf-line{fill:none;stroke:var(--ai-text);stroke-width:1.4;vector-effect:non-scaling-stroke}
 .perf-area{fill:rgba(237,237,239,.07);stroke:none}
 .perf-dot{fill:var(--oa-red)}
 .legend-line.err{background:var(--oa-red)}
 
-/* ---------- 配额可视化 ---------- */
-/* 进度条：外层轨道 + 内层填充（颜色分档 ok/warn/fail） */
+/* ==================== 配额可视化 ==================== */
 .quota-bar{position:relative;height:6px;border-radius:999px;background:var(--ai-field-bg);overflow:hidden}
 .quota-bar.lg{height:10px;border-radius:6px}
 .quota-bar i{position:absolute;inset:0 auto 0 0;border-radius:inherit;transition:width .4s ease}
 .quota-bar i.ok,.bucket-col i.ok{background:var(--oa-green)}
 .quota-bar i.warn,.bucket-col i.warn{background:#e6b450}
 .quota-bar i.fail,.bucket-col i.fail{background:var(--oa-red)}
-
-/* 概览：左侧总量 + 右侧分布直方图 */
-.quota-overview{display:grid;grid-template-columns:minmax(260px,1.2fr) 1fr;gap:26px;align-items:end;background:var(--ai-surface-container-low);border-radius:14px;padding:18px 20px;margin-bottom:26px}
-.quota-total{display:flex;flex-direction:column;gap:10px}
-.quota-total-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.quota-overview{display:flex;gap:26px;align-items:end;background:var(--ai-surface-container-low);border-radius:14px;padding:18px 20px;margin-bottom:24px;flex-wrap:wrap}
+.quota-total{display:flex;flex-direction:column;gap:10px;flex:1 1 260px;min-width:0}
+.quota-total-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .quota-total-head strong{font-size:26px;font-weight:600;font-variant-numeric:tabular-nums}
 .quota-total-head strong span{font-size:13px;font-weight:400;color:var(--ai-text-secondary)}
-.quota-buckets{display:flex;align-items:flex-end;gap:14px;height:104px}
+.quota-buckets{display:flex;align-items:flex-end;gap:14px;height:104px;flex:1 1 200px;min-width:0}
 .quota-buckets .bucket{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;height:100%}
 .quota-buckets .bucket-count{font-size:11px;font-variant-numeric:tabular-nums;color:var(--ai-text-secondary)}
 .quota-buckets .bucket-col{flex:1;width:100%;max-width:34px;display:flex;align-items:flex-end;background:var(--ai-field-bg);border-radius:6px;overflow:hidden}
 .quota-buckets .bucket-col i{width:100%;min-height:3px;border-radius:6px 6px 0 0;transition:height .4s ease}
 .quota-buckets .bucket-label{font-size:10px;color:var(--ai-text-secondary);white-space:nowrap}
-
-/* 账号行里的迷你配额条：fast / auto 各一条 */
-.quota-chip{display:inline-flex;align-items:center;gap:6px;padding:3px 8px;border-radius:999px;background:var(--ai-field-bg);font-variant-numeric:tabular-nums}
+.quota-chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:var(--ai-field-bg);font-variant-numeric:tabular-nums}
 .quota-chip em{font-style:normal;font-size:10px;color:var(--ai-text-secondary)}
 .quota-chip .quota-track{position:relative;width:52px;height:5px;border-radius:999px;background:rgba(255,255,255,.09);overflow:hidden}
 .quota-chip .quota-track i{position:absolute;inset:0 auto 0 0;border-radius:inherit;transition:width .4s ease}
@@ -87,89 +144,108 @@
 .quota-chip .quota-track i.fail{background:var(--oa-red)}
 .quota-chip b{font-size:10px;font-weight:500}
 
-/* ---------- 日志无限滚动提示 ---------- */
+/* ==================== 日志无限滚动提示 ==================== */
 .load-more{text-align:center;font-size:11px;color:var(--ai-text-secondary);opacity:.75;padding:14px 0 4px}
 
-/* ---------- 详情面板内容 ---------- */
+/* ==================== 详情面板（滑入动画） ==================== */
+.detail-panel{animation:detailSlideIn .22s ease}
+@keyframes detailSlideIn{from{transform:translateX(30px);opacity:.5}to{transform:none;opacity:1}}
 .detail-title{font-size:15px;font-weight:550;line-height:1.45;margin-bottom:6px;overflow-wrap:anywhere}
-.detail-subtitle{font-size:11px;color:var(--ai-text-secondary);margin-bottom:16px;overflow-wrap:anywhere}
+.detail-subtitle{font-size:11px;color:var(--ai-text-secondary);margin-bottom:14px;overflow-wrap:anywhere}
 .detail-body{font-size:12px;line-height:1.85;color:var(--ai-text);white-space:pre-wrap;overflow-wrap:anywhere;margin-bottom:16px}
 .detail-actions{display:flex;gap:8px;margin-top:12px}
 .detail-panel .result-item{padding:12px 14px}
 
-/* ---------- 响应式（跟随参考站断点：1200 / 960 / 700） ----------
- * 关键点：参考站把 .node-row 在移动端变成"三列卡片"、rail 变成底部胶囊导航、
- *        detail 面板全屏。自定义行同样是 .node-row，必须在同一断点给出对应的卡片布局，
- *        否则会把参考站的移动端网格覆盖成挤压的桌面表格。
- */
+/* ==================== 通知提示（淡入） ==================== */
+.notice{animation:fadeIn .25s ease;font-size:11px;color:var(--ai-text-secondary);margin-top:6px;line-height:1.5}
+@keyframes fadeIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
 
-/* 平板横向：日志行藏掉"结果数"列，保持紧凑 */
+/* ==================== 响应式 ==================== */
+
+/* 平板横向 ≥701px ≤1200px  */
 @media(min-width:701px) and (max-width:1200px){
-  .log-row{grid-template-columns:66px minmax(150px,2.2fr) 102px 102px 56px 12px;gap:12px}
+  .log-query{font-size:12px}
   .log-counts{display:none}
-  .acct-row{grid-template-columns:minmax(170px,2fr) auto 62px 120px 66px;gap:12px}
+  .acct-stat{min-width:80px}
 }
 
-/* 平板竖向：账号行藏掉统计列 */
+/* 平板竖向 ≥701px ≤960px */
 @media(min-width:701px) and (max-width:960px){
-  .log-row{grid-template-columns:60px minmax(130px,2fr) 96px 96px 56px 12px;gap:10px;padding:12px 14px}
-  .acct-row{grid-template-columns:minmax(150px,2fr) auto 60px 66px;gap:10px;padding:12px 14px}
+  .log-row{gap:8px;padding:10px 12px}
+  .log-time{width:46px;font-size:10px}
   .acct-stat{display:none}
+  .quota-overview{gap:18px}
+  .quota-buckets{height:80px}
+  .quota-total-head strong{font-size:22px}
 }
 
-/* 手机：完全跟随参考站的卡片式布局（rail 变成顶部胶囊导航、列表变成卡片、详情全屏） */
+/* 手机 ≤700px */
 @media(max-width:700px){
-  /* 日志卡片：时间+状态在第一行，搜索词整行，下面三列指标，去掉箭头（整卡可点） */
-  .log-row{grid-template-columns:1fr 1fr 1fr;gap:14px 10px;padding:16px;min-height:0;border-radius:14px;position:relative}
-  .log-time{grid-column:1/3;font-size:11px;align-self:center}
-  .log-query{grid-column:1/-1;font-size:14px;font-weight:550;white-space:normal;line-height:1.45}
-  .log-counts,.log-ms{display:block;font-size:11px;white-space:normal}
-  .log-result{grid-column:3;justify-self:end;align-self:center}
+  /* 概览 summary 单列 */
+  .summary-secondary{flex-wrap:wrap;gap:12px}
+
+  /* 日志卡片 */
+  .log-row{flex-wrap:wrap;gap:10px;padding:14px;border-radius:13px;min-height:0}
+  .log-time{flex:1 1 80px;min-width:0}
+  .log-query{flex:1 1 100%;font-size:13px;white-space:normal;line-height:1.4}
+  .log-counts{flex:1 1 auto}
+  .log-dur{flex:1 1 80px}
   .log-row .node-chevron{display:none}
 
-  /* 账号卡片：身份整行，配额整行，下面一行放状态/统计/删除 */
-  .acct-row{grid-template-columns:auto 1fr auto;gap:12px;padding:16px;min-height:0;border-radius:14px}
-  .acct-row .node-identity{grid-column:1/-1}
-  .acct-quota{grid-column:1/-1;justify-self:start;flex-wrap:wrap}
-  .acct-state{justify-self:start}
-  .acct-stat{display:block;justify-self:start}
-  .acct-row .pill{justify-self:end}
+  /* 账号卡片 */
+  .acct-row{flex-wrap:wrap;gap:10px;padding:14px;border-radius:13px;min-height:0}
+  .acct-row .node-identity{flex:1 1 100%}
+  .acct-quota{flex:1 1 100%;justify-content:flex-start}
+  .acct-state{min-width:48px}
+  .acct-stat{flex:1 1 120px}
+  .acct-row .pill{flex-shrink:0}
 
-  /* 顶部胶囊导航：4 个入口必须都能看到/可滑动
-   * 参考站的 .workspace-body{overflow:hidden} 会把放不下的导航项直接裁掉，
-   * 所以这里允许导航横向滚动，并给文字加省略号兜底。 */
+  /* 导航：胶囊导航允许横滚 */
   .rail nav{overflow-x:auto;scrollbar-width:none;justify-content:center}
   .rail nav::-webkit-scrollbar{display:none}
-  .rail nav>a{flex:1 1 auto;min-width:0;white-space:nowrap;font-size:11px;padding:6px 6px;gap:5px}
+  .rail nav>a{flex:1 1 auto;min-width:0;white-space:nowrap;font-size:11px;padding:7px 8px;gap:5px;min-height:40px}
   .rail nav>a>span:not(.nav-count){overflow:hidden;text-overflow:ellipsis}
   .rail .nav-item svg{width:13px;height:13px}
 
-  /* 图表在手机端占满整行（参考站 .summary-traffic{grid-column:1/-1} 已处理，这里只调高度） */
+  /* 图表 */
   .summary-chart{height:42px}
 
-  /* 段落标题：小屏换行时标题独占一行，说明文字另起一行，避免标题被挤成两字一行 */
+  /* 段落标题 */
   .section-heading{flex-wrap:wrap;row-gap:6px}
   .section-heading h2{white-space:nowrap}
   .section-heading .subtle{flex:1 1 100%;line-height:1.5}
 
-  /* 配额总览：总量与分布图上下排布，迷你条收窄 */
-  .quota-overview{grid-template-columns:1fr;gap:18px;padding:16px}
-  .quota-total-head strong{font-size:22px}
-  .quota-buckets{height:88px;gap:10px}
+  /* 配额 */
+  .quota-overview{flex-direction:column;gap:16px;padding:14px}
+  .quota-buckets{height:80px;gap:10px}
   .quota-chip .quota-track{width:40px}
 
-  /* 导入框内边距收窄，避免小屏溢出 */
+  /* 大触控目标 */
+  .pill,.nav-item,.icon-button{min-height:44px;padding:10px 16px;font-size:12px}
+  .pill.danger{min-height:38px;padding:8px 14px}
+  button,input,textarea{min-height:44px;font-size:16px!important} /* 防止 iOS 缩放 */
+  .import-box textarea{min-height:100px;font-size:14px!important}
+
+  /* 导入框 */
   .import-box{padding:12px}
   .import-actions{flex-wrap:wrap;gap:8px}
 
-  /* 详情面板全屏时，内部列表恢复单列留白 */
+  /* 详情全屏 */
   .detail-scroll{padding:12px 14px 20px}
-  .detail-panel .result-list{margin-bottom:18px}
+  .detail-panel .result-list{margin-bottom:16px}
 }
 
-/* 超窄屏（≤420px）：导航进一步紧凑，保证 4 项单行放下 */
+/* 超窄屏 ≤420px */
 @media(max-width:420px){
-  .rail nav>a{font-size:10px;padding:5px 4px;gap:4px}
+  .rail nav>a{font-size:10px;padding:6px 5px;gap:4px;min-height:38px}
   .rail .nav-item svg{width:12px;height:12px}
   .rail{padding:4px}
+  .log-time{font-size:9px}
+  .log-query{font-size:12px}
+  .headline-metric strong{font-size:28px}
+  .ring-cell{flex-direction:row;gap:8px}
+  .ring-center strong{font-size:14px}
+  .metric-cell strong{font-size:13px}
+  .acct-row,.log-row{padding:12px;gap:8px}
+  .acct-state{min-width:40px;font-size:10px}
 }

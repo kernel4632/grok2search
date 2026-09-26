@@ -91,6 +91,23 @@ createApp({
         max,
       };
     },
+    /** 成功率环形图：圆周长 + 缺口偏移（SVG stroke-dasharray 实现） */
+    ring() {
+      const radius = 15.5;
+      const c = 2 * Math.PI * radius;
+      return { c, off: c * (1 - this.recent.rate / 100) };
+    },
+    /** 账号状态分段条：空闲/忙碌/冷却/耗尽 各占比例 */
+    accountSegments() {
+      const a = this.status.accounts;
+      const total = a.total || 1;
+      return [
+        { label: "空闲", value: a.idle, cls: "idle", pct: Math.round((a.idle / total) * 100) },
+        { label: "忙碌", value: a.busy, cls: "busy", pct: Math.round((a.busy / total) * 100) },
+        { label: "冷却", value: a.cooldown, cls: "cool", pct: Math.round((a.cooldown / total) * 100) },
+        { label: "耗尽", value: a.exhausted, cls: "drain", pct: Math.round((a.exhausted / total) * 100) },
+      ].filter((s) => s.value > 0);
+    },
     /** 配额总览：fast 剩余总量 + 5 档分布直方图（数据来自每个账号的 quota.fast） */
     quotaSummary() {
       const windows = this.accounts.map((account) => account.quota?.fast).filter((w) => w && w.total > 0);
@@ -188,8 +205,8 @@ createApp({
         open: true, title: log.query || "（无搜索词）", subtitle: this.shortTime(log.at),
         meta: [
           ["状态", log.ok ? "成功" : "失败"],
-          ["首字", `${log.firstResultMs ?? "—"} ms`],
-          ["总耗时", `${log.elapsedMs ?? "—"} ms`],
+          ["首字", `${durText(log.firstResultMs)}`],
+          ["总耗时", `${durText(log.elapsedMs)}`],
           ["结果", `${log.pages ?? 0} 网页 / ${log.posts ?? 0} 帖子`],
           ...(log.error ? [["错误", log.error]] : []),
         ],
@@ -246,12 +263,29 @@ createApp({
       if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
       return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
     },
+    /** 把毫秒换成"3.2s / 1.2m"这种更友好的时长 */
+    durText(ms) {
+      if (ms == null) return "—";
+      if (ms < 1000) return `${ms} ms`;
+      if (ms < 60_000) return `${(ms / 1000).toFixed(1)} s`;
+      return `${(ms / 60_000).toFixed(1)} m`;
+    },
     clean(text, max = 260) {
       const value = String(text ?? "").replace(/\s+/g, " ").trim();
       return value.length > max ? `${value.slice(0, max)}…` : value;
     },
     host(url) {
       try { return new URL(url).host; } catch { return url; }
+    },
+    /** 相对条内百分比（日志耗时 mini bar） */
+    barPct(value, max) {
+      if (value == null || !max) return 0;
+      return Math.min(100, Math.max(0, Math.round((value / max) * 100)));
+    },
+    /** 账号成功比例（5:1 即 83%） */
+    okPct(account) {
+      const t = (account.ok || 0) + (account.fail || 0);
+      return t ? Math.round((account.ok / t) * 100) : 50;
     },
 
     // ---------- 账号操作 ----------

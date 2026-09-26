@@ -71,14 +71,25 @@
         <section v-show="view === 'overview'">
           <section class="summary">
             <div class="summary-primary">
-              <span class="metric-label">账号总数</span>
+              <span class="metric-label">账号状态</span>
               <div class="headline-metric"><strong>{{ status.accounts.total }}</strong><span>/ 空闲 {{ status.accounts.idle }}</span></div>
-              <span class="summary-note">忙碌 {{ status.accounts.busy }} · 冷却 {{ status.accounts.cooldown }}</span>
+              <div class="acct-segbar" v-if="status.accounts.total" role="img" aria-label="账号状态分布">
+                <i v-for="s in accountSegments" :key="s.cls" :class="s.cls" :style="{ flex: s.pct + ' 0 calc(' + s.pct + '% - 2px)' }"></i>
+              </div>
+              <div class="seg-legend">
+                <span v-for="s in accountSegments" :key="s.cls"><i :class="s.cls"></i>{{ s.label }} {{ s.value }}</span>
+              </div>
             </div>
             <div class="summary-secondary">
-              <div><span class="metric-label">平均首字</span><strong>{{ recent.avgFirst }} ms</strong></div>
-              <div><span class="metric-label">平均总耗时</span><strong>{{ recent.avgMs }} ms</strong></div>
-              <div><span class="metric-label">成功率</span><strong>{{ recent.rate }}%</strong></div>
+              <div class="ring-cell">
+                <svg class="ring" viewBox="0 0 36 36">
+                  <circle class="ring-bg" cx="18" cy="18" r="15.5"/>
+                  <circle class="ring-fg" cx="18" cy="18" r="15.5" :stroke-dasharray="ring.c" :stroke-dashoffset="ring.off"/>
+                </svg>
+                <div class="ring-center"><strong>{{ recent.rate }}%</strong><small>成功率</small></div>
+              </div>
+              <div class="metric-cell"><span class="metric-label">平均首字</span><strong>{{ durText(recent.avgFirst) }}</strong><small> 首结果</small></div>
+              <div class="metric-cell"><span class="metric-label">平均总耗时</span><strong>{{ durText(recent.avgMs) }}</strong><small> / 次</small></div>
             </div>
             <div class="summary-traffic">
               <div class="traffic-heading">
@@ -118,9 +129,11 @@
             <div class="node-row log-row" v-for="item in logs.slice(0, 8)" :key="item.id" @click="openLog(item)">
               <span class="log-time">{{ shortTime(item.at) }}</span>
               <span class="log-query">{{ item.query || '—' }}</span>
-              <span class="log-counts">{{ item.pages ?? 0 }} 页 / {{ item.posts ?? 0 }} 帖</span>
-              <span class="log-ms">首字 {{ item.firstResultMs ?? '—' }} ms</span>
-              <span class="log-ms">总计 {{ item.elapsedMs ?? '—' }} ms</span>
+              <span class="log-counts"><b>{{ item.pages ?? 0 }}</b> 页 · <b>{{ item.posts ?? 0 }}</b> 帖</span>
+              <span class="log-dur">
+                <span class="dur-bar"><i :style="{ width: barPct(item.elapsedMs, perf.max) + '%' }" :class="item.ok ? 'ok' : 'fail'"></i></span>
+                <b>{{ durText(item.elapsedMs) }}</b>
+              </span>
               <span class="log-result"><span class="badge" :class="item.ok ? 'ok' : 'fail'">{{ item.ok ? '成功' : '失败' }}</span></span>
               <svg class="node-chevron"><use href="#i-chevron"/></svg>
             </div>
@@ -173,7 +186,10 @@
                 <span v-else-if="!account.quota?.fast" class="subtle">配额未知</span>
               </span>
               <span class="acct-state" :class="accountState(account) === '空闲' ? '' : 'dim'">{{ accountState(account) }}</span>
-              <span class="acct-stat">成功 {{ account.ok }} · 失败 {{ account.fail }}<template v-if="account.streak > 1"> · 连败 {{ account.streak }}</template></span>
+              <span class="acct-stat">
+                <span class="stat-bar"><i class="ok" :style="{ flex: okPct(account) + ' 0 calc(' + okPct(account) + '% - 1px)' }"></i><i class="fail" :style="{ flex: (100-okPct(account)) + ' 0 calc(' + (100-okPct(account)) + '% - 1px)' }"></i></span>
+                <span class="stat-text">成功 {{ account.ok }} · 失败 {{ account.fail }}<template v-if="account.streak > 1"> · 连败 {{ account.streak }}</template></span>
+              </span>
               <button class="pill danger" :disabled="busy.del === account.id" @click="removeAccount(account)">删除</button>
             </div>
             <div v-if="accounts.length === 0" class="empty-state"><svg><use href="#i-server"/></svg><h2>号池为空</h2><p>用 grok2api 的导出脚本生成 accounts.json，或在上方批量导入 SSO。</p></div>
@@ -228,9 +244,11 @@
             <div class="node-row log-row" v-for="item in logs" :key="item.id" @click="openLog(item)">
               <span class="log-time">{{ shortTime(item.at) }}</span>
               <span class="log-query">{{ item.query || '—' }}</span>
-              <span class="log-counts">{{ item.pages ?? 0 }} 页 / {{ item.posts ?? 0 }} 帖</span>
-              <span class="log-ms">首字 {{ item.firstResultMs ?? '—' }} ms</span>
-              <span class="log-ms">总计 {{ item.elapsedMs ?? '—' }} ms</span>
+              <span class="log-counts"><b>{{ item.pages ?? 0 }}</b> 页 · <b>{{ item.posts ?? 0 }}</b> 帖</span>
+              <span class="log-dur">
+                <span class="dur-bar"><i :style="{ width: barPct(item.elapsedMs, perf.max) + '%' }" :class="item.ok ? 'ok' : 'fail'"></i></span>
+                <b>{{ durText(item.elapsedMs) }}</b>
+              </span>
               <span class="log-result"><span class="badge" :class="item.ok ? 'ok' : 'fail'">{{ item.ok ? '成功' : '失败' }}</span></span>
               <svg class="node-chevron"><use href="#i-chevron"/></svg>
             </div>
