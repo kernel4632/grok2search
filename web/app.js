@@ -205,8 +205,8 @@ createApp({
         open: true, title: log.query || "（无搜索词）", subtitle: this.shortTime(log.at),
         meta: [
           ["状态", log.ok ? "成功" : "失败"],
-          ["首字", `${durText(log.firstResultMs)}`],
-          ["总耗时", `${durText(log.elapsedMs)}`],
+          ["首字", `${this.durText(log.firstResultMs)}`],
+          ["总耗时", `${this.durText(log.elapsedMs)}`],
           ["结果", `${log.pages ?? 0} 网页 / ${log.posts ?? 0} 帖子`],
           ...(log.error ? [["错误", log.error]] : []),
         ],
