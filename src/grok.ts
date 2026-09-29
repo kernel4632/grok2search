@@ -48,6 +48,8 @@ export interface SearchData {
   /** 首个搜索结果到达的时间（毫秒，面板"首字"指标） */
   firstResultMs?: number;
   elapsedMs?: number;
+  /** 上游搜索波次（metadata.step_id 最大值；≥2 且无正文基本等于模型空转） */
+  steps?: number;
 }
 
 /** 请求日志（内存环形缓冲 + 结果快照，供面板展示与点击查看） */
@@ -462,10 +464,12 @@ export function collectSession(account: Account, query: string, config: SearchCo
     let maxTimer: ReturnType<typeof setTimeout> | undefined;
     let firstProgressTimer: ReturnType<typeof setTimeout> | undefined;
     let answerTimer: ReturnType<typeof setTimeout> | undefined;
+    let doomTimer: ReturnType<typeof setTimeout> | undefined;
     let heartbeat: ReturnType<typeof setInterval> | undefined;
     let done = false;
     let settled = false;
     let gotResult = false; // 是否已收到搜索结果（用于 answer 兜底计时）
+    let maxStep = 0; // 上游搜索波次（metadata.step_id 最大值）
 
     /** 收工/失败统一出口（清资源、补耗时与上限、只结算一次） */
     const finish = (ok: boolean, error?: Error) => {
@@ -475,12 +479,14 @@ export function collectSession(account: Account, query: string, config: SearchCo
       clearTimeout(maxTimer);
       clearTimeout(firstProgressTimer);
       clearTimeout(answerTimer);
+      clearTimeout(doomTimer);
       clearInterval(heartbeat);
       try { ws?.close(); } catch {}
       if (ok) {
         data.elapsedMs = Date.now() - startedAt;
         data.pages = data.pages.slice(0, config.maxPages);
         data.posts = data.posts.slice(0, config.maxPosts);
+        data.steps = maxStep;
         resolve(data);
       } else {
         reject(error ?? new SessionError("未获得搜索结果"));
@@ -492,6 +498,16 @@ export function collectSession(account: Account, query: string, config: SearchCo
       if (!waitForAnswer || settled) return;
       clearTimeout(answerTimer);
       answerTimer = setTimeout(() => finish(data.pages.length + data.posts.length > 0), config.answerTimeoutMs ?? 25_000);
+    };
+
+    // 总结模式空转检测：实测正常会话最多 2 波搜索且正文 4 秒即来；
+    // 一旦进入第 3 波仍无正文，上游基本已静默，判失败换号（大概率拿到完整回答）
+    const armDoomTimer = () => {
+      if (!waitForAnswer || settled || data.answer || maxStep < 2) return;
+      clearTimeout(doomTimer);
+      doomTimer = setTimeout(() => {
+        if (!settled && !data.answer) finish(false, new SessionError("模型多轮搜索无回答，换号重试"));
+      }, 8_000);
     };
 
     // 哑号快速失败：限时内没有任何搜索进展（连搜索词都没有）就直接换号
@@ -571,12 +587,18 @@ export function collectSession(account: Account, query: string, config: SearchCo
           if (event.type === "session.ended") { if (!done) finish(false, new SessionError("上游会话提前结束")); return; }
 
           // 搜索语义事件
+          const step = event.chunk?.metadata?.step_id;
+          if (typeof step === "number" && step > maxStep) {
+            maxStep = step;
+            armDoomTimer(); // 进入新一波搜索仍无正文？大概率空转，8 秒后判失败换号
+          }
           const parsed = parseFrame(event, frameState);
           if (!parsed) return;
           if (parsed.type === "error") return finish(false, new SessionError(parsed.message));
           if (parsed.type === "text_delta") {
             data.answer = (data.answer ?? "") + parsed.text;
             clearTimeout(answerTimer); // 正文开始吐了，撤销兜底计时
+            clearTimeout(doomTimer); // 有正文就不是空转
             hooks?.onText?.(parsed.text);
             return;
           }
@@ -680,7 +702,7 @@ export class Searcher {
           { caller, query, accountId: account.id, pages: data.pages.length, posts: data.posts.length, firstResultMs: data.firstResultMs, elapsedMs: data.elapsedMs ?? Date.now() - startedAt, ok: true },
           { text: toText(data, query, config.snippetMaxChars), json: toJSON(data) },
         );
-        log("info", "search", { logId: entry.id, caller, query, accountId: account.id, attempts: tried.size, pages: data.pages.length, posts: data.posts.length, hasAnswer: !!data.answer, firstResultMs: data.firstResultMs, elapsedMs: Date.now() - startedAt, ok: true });
+        log("info", "search", { logId: entry.id, caller, query, accountId: account.id, attempts: tried.size, pages: data.pages.length, posts: data.posts.length, steps: data.steps, hasAnswer: !!data.answer, firstResultMs: data.firstResultMs, elapsedMs: Date.now() - startedAt, ok: true });
         return data;
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
