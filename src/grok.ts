@@ -674,6 +674,8 @@ export class Searcher {
    * 对冲策略（staggered hedging）：主路启动 hedgeDelayMs 后若仍无正文，
    * 并行再起一路（不同号）；首个带正文结束者获胜，输家取消（不计失败）。
    * 搜索结果跨路去重共享，下游拿到的是两路结果的并集，正文只取胜者。
+   * 思考去重：话筒只给第一路"有结果"的尝试，第一轮结果下发后锁死，
+   * 换号/对冲不再往思考里塞，只等正文；第一路零结果则转交仍在跑的尝试。
    * 软超时（requestTimeoutMs，默认 28 秒）：到点取消在 flight 的尝试并带着已有
    * 结果返回，保证 30 秒限制的下游必定拿到东西（正文率靠对冲+重试顶上去）。
    */
@@ -698,6 +700,11 @@ export class Searcher {
 
     const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+    // 思考话筒：只给第一路"有结果"的尝试。第一轮结果完整下发后锁死，
+    // 换号/对冲不再往思考里塞东西，只等正文（避免思考被多路结果灌水）。
+    // 若第一路零结果收场，话筒转交给仍在跑的尝试（或下一轮首路认领）。
+    const searchGate: { uid: string | null } = { uid: null };
+
     // 请求级软超时：到点取消所有在 flight 的尝试，带着已有结果返回。
     // 保证下游（30 秒限制的 MCP/搜索工具）在 30 秒内必定拿到东西，正文率靠对冲+重试顶上去。
     const requestMs = config.requestTimeoutMs ?? 28_000;
@@ -711,7 +718,7 @@ export class Searcher {
 
     try {
       while (attempts < config.maxAttempts && Date.now() - startedAt <= config.retryBudgetMs && !deadlineFired) {
-        const round = await this.hedgedRound(query, config, tried, emitSearch, hooks?.onText, () => attempts++, active, canLaunch);
+        const round = await this.hedgedRound(query, config, tried, emitSearch, hooks?.onText, () => attempts++, active, canLaunch, searchGate);
         if (round.winner) {
           const data = round.winner;
           const entry = recordSearch(
@@ -779,6 +786,7 @@ export class Searcher {
     countAttempt: () => void,
     active: Map<AbortController, () => void>,
     canLaunch: () => boolean,
+    searchGate: { uid: string | null },
   ): Promise<{ winner?: SearchData & { answer?: string }; accountId?: string; fallback?: SearchData & { answer?: string }; error?: Error; waited?: boolean; exhausted?: boolean; hedged?: boolean }> {
     const hedgeMs = config.hedgeDelayMs ?? 10_000;
 
@@ -801,10 +809,15 @@ export class Searcher {
       countAttempt();
       const controller = new AbortController();
       const slot: Slot = { account, controller, isPrimary, settled: false, abortedUs: false, answerBytes: 0, promise: null as any };
+      // 认领思考话筒：只有第一路（gate 为空时）能往思考里吐结果
+      if (!searchGate.uid) searchGate.uid = account.uid;
       // 注册到在 flight 表：超时熔断时可从外部取消
       active.set(controller, () => { if (!slot.settled) { slot.abortedUs = true; try { controller.abort(); } catch {} } });
       slot.promise = collectSession(account, query, config, this.clearance, () => crypto.randomUUID(), controller.signal, {
-        onSearch: emitSearch,
+        onSearch: emitSearch ? (kind, item) => {
+          if (searchGate.uid !== account.uid) return; // 话筒不在这路：只收集不下发
+          emitSearch(kind, item);
+        } : undefined,
         onText: (t) => {
           if (!slot.isPrimary) return; // 备路正文不直播，获胜后整体下发
           slot.answerBytes += t.length;
@@ -820,6 +833,12 @@ export class Searcher {
         if (slot.abortedUs) this.pool.releaseNeutral(account);
         else this.pool.release(account, !!r.data, r.error?.message);
         this.onAttempt?.(account);
+        // 话筒交接：持筒者零结果收场，把话筒转给仍在跑的尝试（或下一轮首路认领）
+        if (searchGate.uid === account.uid && !(r.data && (r.data.pages.length + r.data.posts.length > 0))) {
+          searchGate.uid = null;
+          const running = slots.find((s) => !s.settled);
+          if (running) searchGate.uid = running.account.uid;
+        }
         return r;
       });
       slots.push(slot);
