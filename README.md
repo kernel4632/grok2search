@@ -147,6 +147,9 @@ curl http://127.0.0.1:46328/v1/chat/completions \
 | `search.quietMs` | 4000 | 搜索静默多久算"搜完" |
 | `search.maxMs` | 18000 | 单路硬上限 |
 | `search.firstProgressMs` | 10000 | 哑号快速让位：限时内毫无搜索进展即换号 |
+| `search.answerMaxMs` | 120000 | grok-search 模型单路等正文硬上限 |
+| `search.answerTimeoutMs` | 25000 | grok-search 模型：有结果后正文超期不来，用搜索结果兜底 |
+| `search.hedgeDelayMs` | 10000 | grok-search 模型对冲延迟：主路超期零正文则并行备路，首个正文者胜 |
 | `quota.intervalMs` | 21600000 | 账号配额全量刷新周期（6 小时；0=只手动/顺带刷新） |
 | `quota.concurrency` | 3 | 配额刷新并发（带 120ms 限速，避免打爆上游） |
 | `dataDir` | data | 运行数据目录（`search.db` 搜索记录 + `quota.json` 配额缓存） |

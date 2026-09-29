@@ -25,7 +25,8 @@
     "instruction": "You MUST use web search (and X/Twitter search when relevant) to gather the latest, most accurate and up-to-date information before answering. Always search first, then answer based on the search results, and cite your sources in your response.",
     "firstProgressMs": 10000,
     "maxAttempts": 12,
-    "retryBudgetMs": 150000
+    "retryBudgetMs": 150000,
+    "hedgeDelayMs": 10000
   },
   "cooldownMs": 60000,
   "clearanceTtlMs": 600000,

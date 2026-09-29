@@ -62,6 +62,7 @@ const searchConfig: SearchConfig = {
   maxPosts: userConfig.search?.maxPosts ?? 20,
   answerMaxMs: userConfig.search?.answerMaxMs ?? 120_000,
   answerTimeoutMs: userConfig.search?.answerTimeoutMs ?? 25_000,
+  hedgeDelayMs: userConfig.search?.hedgeDelayMs ?? 10_000,
   chatInstruction: userConfig.search?.chatInstruction ?? SEARCH_INSTRUCTION,
   sessionModel: config.upstream.sessionModel,
   baseUrl: config.upstream.baseUrl,

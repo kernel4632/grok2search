@@ -93,6 +93,8 @@ export interface SearchConfig {
   answerMaxMs?: number;
   /** grok-search 模型：搜到结果后，若正文迟迟不开始吐，就用搜索结果兜底收工（秒） */
   answerTimeoutMs?: number;
+  /** 对冲延迟（毫秒）：主路超期仍无正文时，并行再起一路；0 = 总是并行 */
+  hedgeDelayMs?: number;
   /** grok-search 模型的引导词（让模型知道自己是搜索助手；缺省用 instruction） */
   chatInstruction?: string;
 }
@@ -267,6 +269,13 @@ export class Pool {
       const backoff = Math.min(this.cooldownMs * 2 ** (target.streak - 1), Pool.MAX_BACKOFF_MS);
       target.cooldownUntil = Date.now() + backoff;
     }
+  }
+
+  /** 归还账号但不计成功失败（对冲取消的慢路用，避免误伤健康账号） */
+  releaseNeutral(account: Account) {
+    const target = this.accounts.find((a) => a.uid === account.uid);
+    if (!target) return;
+    target.busy = false;
   }
 
   async add(input: { uid: string; sso: string; name?: string; id?: string }) {
@@ -628,6 +637,9 @@ export function collectSession(account: Account, query: string, config: SearchCo
 
 export class NoAccountError extends Error {}
 
+/** 对冲尝试的结算结果（成功带数据 / 失败带错，二者必居其一） */
+type AttemptOutcome = { account: Account; data?: SearchData & { answer?: string }; error?: Error };
+
 export class Searcher {
   constructor(
     private pool: Pool,
@@ -649,12 +661,207 @@ export class Searcher {
   }
 
   /**
-   * grok-search 模型：搜到结果后继续等模型把总结写完（答案全文）。
+   * grok-search 模型：搜到结果后继续等模型把总结写完（答案全文），带对冲。
    * hooks.onSearch=搜索结果增量（吐到"思考"），hooks.onText=答案文本增量（吐到正文）。
+   *
+   * 对冲策略（staggered hedging）：主路启动 hedgeDelayMs 后若仍无正文，
+   * 并行再起一路（不同号）；首个带正文结束者获胜，输家取消（不计失败）。
+   * 搜索结果跨路去重共享，下游拿到的是两路结果的并集，正文只取胜者。
    */
   async chat(query: string, caller: string, hooks?: { onSearch?: (chunk: string) => void; onText?: (text: string) => void }): Promise<SearchData & { answer?: string }> {
-    const chatConfig = { ...this.config, waitForAnswer: true, maxMs: this.config.answerMaxMs ?? 120_000, instruction: this.config.chatInstruction ?? this.config.instruction };
-    return this.run(query, caller, chatConfig, { onSearch: hooks?.onSearch, onText: hooks?.onText });
+    const config: SearchConfig = { ...this.config, waitForAnswer: true, maxMs: this.config.answerMaxMs ?? 120_000, instruction: this.config.chatInstruction ?? this.config.instruction };
+    const startedAt = Date.now();
+    const tried = new Set<string>();
+    const streamed = new Set<string>();
+    let streamIndex = 0;
+    let attempts = 0;
+    let lastError: Error | undefined;
+    let fallback: (SearchData & { answer?: string }) | undefined;
+
+    // 跨路共享的搜索去重下发（两路结果并集都吐给下游）
+    const emitSearch = hooks?.onSearch
+      ? (kind: "page" | "post", item: Page | Post) => {
+          if (streamed.has(item.url)) return;
+          streamed.add(item.url);
+          hooks.onSearch!(streamItem(kind, item, ++streamIndex, config.snippetMaxChars));
+        }
+      : undefined;
+
+    const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    while (attempts < config.maxAttempts && Date.now() - startedAt <= config.retryBudgetMs) {
+      const round = await this.hedgedRound(query, config, tried, emitSearch, hooks?.onText, () => attempts++);
+      if (round.winner) {
+        const data = round.winner;
+        const entry = recordSearch(
+          { caller, query, accountId: round.accountId ?? "hedged", pages: data.pages.length, posts: data.posts.length, firstResultMs: data.firstResultMs, elapsedMs: data.elapsedMs ?? Date.now() - startedAt, ok: true },
+          { text: toText(data, query, config.snippetMaxChars), json: toJSON(data) },
+        );
+        log("info", "search", { logId: entry.id, caller, query, accountId: round.accountId ?? "hedged", attempts, hedged: round.hedged, pages: data.pages.length, posts: data.posts.length, steps: data.steps, hasAnswer: true, firstResultMs: data.firstResultMs, elapsedMs: Date.now() - startedAt, ok: true });
+        return data;
+      }
+      if (round.fallback) fallback = fallback ? this.mergeChatData([fallback, round.fallback], fallback) : round.fallback;
+      if (round.error) lastError = round.error;
+      if (round.waited) { await sleep(1000); continue; }
+      if (round.exhausted) break;
+      // 本轮无胜者：继续下一轮（换号重试）
+    }
+
+    // 预算/次数用尽：有搜索结果兜底就返回（保证 content 非空），否则抛错
+    if (fallback && fallback.pages.length + fallback.posts.length > 0) {
+      const entry = recordSearch(
+        { caller, query, pages: fallback.pages.length, posts: fallback.posts.length, firstResultMs: fallback.firstResultMs, elapsedMs: Date.now() - startedAt, ok: true },
+        { text: toText(fallback, query, config.snippetMaxChars), json: toJSON(fallback) },
+      );
+      log("info", "search", { logId: entry.id, caller, query, attempts, pages: fallback.pages.length, posts: fallback.posts.length, hasAnswer: false, elapsedMs: Date.now() - startedAt, ok: true, note: "answer-fallback" });
+      return fallback;
+    }
+    const reason = lastError ?? new Error("搜索失败");
+    const entry = recordSearch({ caller, query, elapsedMs: Date.now() - startedAt, ok: false, error: `${reason.message}（已尝试 ${attempts} 个账号）` });
+    log("warn", "search", { logId: entry.id, caller, query, attempts, elapsedMs: entry.elapsedMs, ok: false, error: reason.message });
+    throw reason;
+  }
+
+  /** 合并多次尝试的结果（按 URL 去重；正文取 preferred 那份） */
+  private mergeChatData(all: Array<SearchData & { answer?: string }>, preferred: SearchData & { answer?: string }): SearchData & { answer?: string } {
+    const merged: SearchData & { answer?: string } = { queries: [], pages: [], posts: [], answer: preferred.answer };
+    const seenQuery = new Set<string>();
+    const seenPage = new Set<string>();
+    const seenPost = new Set<string>();
+    for (const d of all) {
+      for (const q of d.queries ?? []) if (q && !seenQuery.has(q)) { seenQuery.add(q); merged.queries.push(q); }
+      for (const p of d.pages ?? []) if (p?.url && !seenPage.has(p.url)) { seenPage.add(p.url); merged.pages.push(p); }
+      for (const p of d.posts ?? []) if (p?.url && !seenPost.has(p.url)) { seenPost.add(p.url); merged.posts.push(p); }
+    }
+    const firsts = all.map((d) => d.firstResultMs).filter((v): v is number => typeof v === "number");
+    if (firsts.length) merged.firstResultMs = Math.min(...firsts);
+    const elaps = all.map((d) => d.elapsedMs).filter((v): v is number => typeof v === "number");
+    if (elaps.length) merged.elapsedMs = Math.max(...elaps);
+    const steps = all.map((d) => d.steps).filter((v): v is number => typeof v === "number");
+    if (steps.length) merged.steps = Math.max(...steps);
+    return merged;
+  }
+
+    /**
+   * 一轮对冲：主路先跑，超期无正文则并行备路；首个带正文结束者获胜。
+   * 返回 winner（带正文）/ fallback（无正文但有搜索结果）/ error / waited / exhausted。
+   */
+  private async hedgedRound(
+    query: string,
+    config: SearchConfig,
+    tried: Set<string>,
+    emitSearch: ((kind: "page" | "post", item: Page | Post) => void) | undefined,
+    onTextLive: ((text: string) => void) | undefined,
+    countAttempt: () => void,
+  ): Promise<{ winner?: SearchData & { answer?: string }; accountId?: string; fallback?: SearchData & { answer?: string }; error?: Error; waited?: boolean; exhausted?: boolean; hedged?: boolean }> {
+    const hedgeMs = config.hedgeDelayMs ?? 10_000;
+
+    interface Slot {
+      account: Account;
+      controller: AbortController;
+      isPrimary: boolean;
+      settled: boolean;
+      abortedUs: boolean;
+      answerBytes: number;
+      outcome?: { account: Account; data?: SearchData & { answer?: string }; error?: Error };
+      promise: Promise<{ account: Account; data?: SearchData & { answer?: string }; error?: Error }>;
+    }
+    const slots: Slot[] = [];
+
+    const launch = (isPrimary: boolean): Slot | null => {
+      const account = this.pool.acquireExcept(tried);
+      if (!account) return null;
+      tried.add(account.uid);
+      countAttempt();
+      const controller = new AbortController();
+      const slot: Slot = { account, controller, isPrimary, settled: false, abortedUs: false, answerBytes: 0, promise: null as any };
+      slot.promise = collectSession(account, query, config, this.clearance, () => crypto.randomUUID(), controller.signal, {
+        onSearch: emitSearch,
+        onText: (t) => {
+          if (!slot.isPrimary) return; // 备路正文不直播，获胜后整体下发
+          slot.answerBytes += t.length;
+          onTextLive?.(t);
+        },
+      }).then(
+        (data): AttemptOutcome => ({ account, data }),
+        (error): AttemptOutcome => ({ account, error: error instanceof Error ? error : new Error(String(error)) }),
+      ).then((r) => {
+        slot.settled = true;
+        slot.outcome = r;
+        if (slot.abortedUs) this.pool.releaseNeutral(account);
+        else this.pool.release(account, !!r.data, r.error?.message);
+        this.onAttempt?.(account);
+        return r;
+      });
+      slots.push(slot);
+      return slot;
+    };
+
+    // 单路结算归类：带正文=胜，无正文但有结果=兜底，否则=失败
+    const classify = (o: { account: Account; data?: SearchData & { answer?: string }; error?: Error }) => {
+      if (o.data?.answer?.trim()) return { winner: o.data, accountId: o.account.id };
+      if (o.data) return { fallback: o.data };
+      return { error: o.error ?? new Error("搜索失败") };
+    };
+
+    const primary = launch(true);
+    if (!primary) {
+      const stats = this.pool.stats();
+      if (stats.total === 0) return { error: new NoAccountError("号池为空，请先在面板/accounts.json 添加账号") };
+      if (tried.size >= stats.total) return { exhausted: true };
+      return { waited: true };
+    }
+
+    // 等主路结束，或对冲时间到
+    const hedgeDue = await new Promise<boolean>((resolve) => {
+      const timer = setTimeout(() => resolve(true), Math.max(0, hedgeMs));
+      primary.promise.then(() => { clearTimeout(timer); resolve(false); });
+    });
+    if (!hedgeDue && primary.outcome) {
+      // 主路在对冲前已结束
+      return classify(primary.outcome);
+    }
+    if (!hedgeDue || primary.settled) {
+      const o = await primary.promise;
+      return classify(o);
+    }
+    if (primary.answerBytes > 0) {
+      // 主路正在吐正文（只是慢）：不等备路，直接等它结束
+      const o = await primary.promise;
+      return classify(o);
+    }
+
+    // 主路存活但零正文：并行备路
+    const secondary = launch(false);
+    if (!secondary) {
+      const o = await primary.promise;
+      return classify(o);
+    }
+
+    // 双路并行：首个带正文结束者获胜，另一路取消
+    let winnerSlot: Slot | undefined;
+    const watch = (slot: Slot) => slot.promise.then((o) => {
+      if (!winnerSlot && o.data?.answer?.trim()) {
+        winnerSlot = slot;
+        for (const s of slots) {
+          if (s !== slot && !s.settled) { s.abortedUs = true; try { s.controller.abort(); } catch {} }
+        }
+      }
+      return o;
+    });
+    const outcomes = await Promise.all([watch(primary), watch(secondary)]);
+    const datas = outcomes.map((o) => o.data).filter((d): d is SearchData & { answer?: string } => !!d);
+    if (winnerSlot?.outcome?.data) {
+      const data = winnerSlot.outcome.data;
+      // 备路获胜且主路零字节：把备路全文补进直播流（不会 garble）
+      if (!winnerSlot.isPrimary && primary.answerBytes === 0 && data.answer) onTextLive?.(data.answer);
+      return { winner: this.mergeChatData(datas, data), accountId: winnerSlot.account.id, hedged: true };
+    }
+    if (datas.length) {
+      const merged = this.mergeChatData(datas, datas[0]!);
+      return { fallback: merged, error: outcomes.map((o) => o.error).find(Boolean) };
+    }
+    return { error: outcomes.map((o) => o.error).find(Boolean) ?? new Error("搜索失败"), hedged: true };
   }
 
   /** 共用的换号重试循环（waitForAnswer 由 config 决定；返回带 answer 的结果） */
