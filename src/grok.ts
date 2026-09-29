@@ -95,6 +95,10 @@ export interface SearchConfig {
   answerTimeoutMs?: number;
   /** 对冲延迟（毫秒）：主路超期仍无正文时，并行再起一路；0 = 总是并行 */
   hedgeDelayMs?: number;
+  /** 请求级软超时（毫秒）：grok-search 模式下超时则带着已有结果返回，保证下游 30 秒内有东西；<=0 关闭 */
+  requestTimeoutMs?: number;
+  /** 空转熔断宽限（毫秒）：进入第 3 波搜索后仍无正文则判失败换号 */
+  doomGraceMs?: number;
   /** grok-search 模型的引导词（让模型知道自己是搜索助手；缺省用 instruction） */
   chatInstruction?: string;
 }
@@ -510,13 +514,13 @@ export function collectSession(account: Account, query: string, config: SearchCo
     };
 
     // 总结模式空转检测：实测正常会话最多 2 波搜索且正文 4 秒即来；
-    // 一旦进入第 3 波仍无正文，上游基本已静默，判失败换号（大概率拿到完整回答）
+    // 一旦进入第 3 波仍无正文，上游基本已静默，宽限后判失败换号（大概率拿到完整回答）
     const armDoomTimer = () => {
       if (!waitForAnswer || settled || data.answer || maxStep < 2) return;
       clearTimeout(doomTimer);
       doomTimer = setTimeout(() => {
         if (!settled && !data.answer) finish(false, new SessionError("模型多轮搜索无回答，换号重试"));
-      }, 8_000);
+      }, config.doomGraceMs ?? 6_000);
     };
 
     // 哑号快速失败：限时内没有任何搜索进展（连搜索词都没有）就直接换号
@@ -525,8 +529,11 @@ export function collectSession(account: Account, query: string, config: SearchCo
     // 硬超时：有结果就带着结果返回，没结果算失败（换号重试）
     maxTimer = setTimeout(() => finish(data.pages.length + data.posts.length > 0, new SessionError("会话超时且无结果")), config.maxMs);
 
-    // 取消信号（进程退出/上游异常时清理）
-    const onAbort = () => finish(false, new SessionError("会话被取消"));
+    // 取消信号（对冲落选/请求超时/进程退出时清理；有结果则带着结果返回，无结果算失败）
+    const onAbort = () => {
+      if (data.pages.length + data.posts.length > 0 || (data.answer ?? "").trim()) finish(true);
+      else finish(false, new SessionError("会话被取消"));
+    };
     if (signal.aborted) return onAbort();
     signal.addEventListener("abort", onAbort, { once: true });
 
@@ -661,12 +668,14 @@ export class Searcher {
   }
 
   /**
-   * grok-search 模型：搜到结果后继续等模型把总结写完（答案全文），带对冲。
+   * grok-search 模型：搜到结果后继续等模型把总结写完（答案全文），带对冲+请求级软超时。
    * hooks.onSearch=搜索结果增量（吐到"思考"），hooks.onText=答案文本增量（吐到正文）。
    *
    * 对冲策略（staggered hedging）：主路启动 hedgeDelayMs 后若仍无正文，
    * 并行再起一路（不同号）；首个带正文结束者获胜，输家取消（不计失败）。
    * 搜索结果跨路去重共享，下游拿到的是两路结果的并集，正文只取胜者。
+   * 软超时（requestTimeoutMs，默认 28 秒）：到点取消在 flight 的尝试并带着已有
+   * 结果返回，保证 30 秒限制的下游必定拿到东西（正文率靠对冲+重试顶上去）。
    */
   async chat(query: string, caller: string, hooks?: { onSearch?: (chunk: string) => void; onText?: (text: string) => void }): Promise<SearchData & { answer?: string }> {
     const config: SearchConfig = { ...this.config, waitForAnswer: true, maxMs: this.config.answerMaxMs ?? 120_000, instruction: this.config.chatInstruction ?? this.config.instruction };
@@ -689,22 +698,37 @@ export class Searcher {
 
     const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-    while (attempts < config.maxAttempts && Date.now() - startedAt <= config.retryBudgetMs) {
-      const round = await this.hedgedRound(query, config, tried, emitSearch, hooks?.onText, () => attempts++);
-      if (round.winner) {
-        const data = round.winner;
-        const entry = recordSearch(
-          { caller, query, accountId: round.accountId ?? "hedged", pages: data.pages.length, posts: data.posts.length, firstResultMs: data.firstResultMs, elapsedMs: data.elapsedMs ?? Date.now() - startedAt, ok: true },
-          { text: toText(data, query, config.snippetMaxChars), json: toJSON(data) },
-        );
-        log("info", "search", { logId: entry.id, caller, query, accountId: round.accountId ?? "hedged", attempts, hedged: round.hedged, pages: data.pages.length, posts: data.posts.length, steps: data.steps, hasAnswer: true, firstResultMs: data.firstResultMs, elapsedMs: Date.now() - startedAt, ok: true });
-        return data;
+    // 请求级软超时：到点取消所有在 flight 的尝试，带着已有结果返回。
+    // 保证下游（30 秒限制的 MCP/搜索工具）在 30 秒内必定拿到东西，正文率靠对冲+重试顶上去。
+    const requestMs = config.requestTimeoutMs ?? 28_000;
+    let deadlineFired = false;
+    const active = new Map<AbortController, () => void>();
+    const deadlineTimer = requestMs > 0 ? setTimeout(() => {
+      deadlineFired = true;
+      for (const abort of active.values()) { try { abort(); } catch {} }
+    }, requestMs) : undefined;
+    const canLaunch = () => attempts < config.maxAttempts && !deadlineFired;
+
+    try {
+      while (attempts < config.maxAttempts && Date.now() - startedAt <= config.retryBudgetMs && !deadlineFired) {
+        const round = await this.hedgedRound(query, config, tried, emitSearch, hooks?.onText, () => attempts++, active, canLaunch);
+        if (round.winner) {
+          const data = round.winner;
+          const entry = recordSearch(
+            { caller, query, accountId: round.accountId ?? "hedged", pages: data.pages.length, posts: data.posts.length, firstResultMs: data.firstResultMs, elapsedMs: data.elapsedMs ?? Date.now() - startedAt, ok: true },
+            { text: toText(data, query, config.snippetMaxChars), json: toJSON(data) },
+          );
+          log("info", "search", { logId: entry.id, caller, query, accountId: round.accountId ?? "hedged", attempts, hedged: round.hedged, pages: data.pages.length, posts: data.posts.length, steps: data.steps, hasAnswer: true, firstResultMs: data.firstResultMs, elapsedMs: Date.now() - startedAt, ok: true });
+          return data;
+        }
+        if (round.fallback) fallback = fallback ? this.mergeChatData([fallback, round.fallback], fallback) : round.fallback;
+        if (round.error) lastError = round.error;
+        if (round.waited) { await sleep(1000); continue; }
+        if (round.exhausted) break;
+        // 本轮无胜者：继续下一轮（换号重试）
       }
-      if (round.fallback) fallback = fallback ? this.mergeChatData([fallback, round.fallback], fallback) : round.fallback;
-      if (round.error) lastError = round.error;
-      if (round.waited) { await sleep(1000); continue; }
-      if (round.exhausted) break;
-      // 本轮无胜者：继续下一轮（换号重试）
+    } finally {
+      if (deadlineTimer) clearTimeout(deadlineTimer);
     }
 
     // 预算/次数用尽：有搜索结果兜底就返回（保证 content 非空），否则抛错
@@ -753,6 +777,8 @@ export class Searcher {
     emitSearch: ((kind: "page" | "post", item: Page | Post) => void) | undefined,
     onTextLive: ((text: string) => void) | undefined,
     countAttempt: () => void,
+    active: Map<AbortController, () => void>,
+    canLaunch: () => boolean,
   ): Promise<{ winner?: SearchData & { answer?: string }; accountId?: string; fallback?: SearchData & { answer?: string }; error?: Error; waited?: boolean; exhausted?: boolean; hedged?: boolean }> {
     const hedgeMs = config.hedgeDelayMs ?? 10_000;
 
@@ -775,6 +801,8 @@ export class Searcher {
       countAttempt();
       const controller = new AbortController();
       const slot: Slot = { account, controller, isPrimary, settled: false, abortedUs: false, answerBytes: 0, promise: null as any };
+      // 注册到在 flight 表：超时熔断时可从外部取消
+      active.set(controller, () => { if (!slot.settled) { slot.abortedUs = true; try { controller.abort(); } catch {} } });
       slot.promise = collectSession(account, query, config, this.clearance, () => crypto.randomUUID(), controller.signal, {
         onSearch: emitSearch,
         onText: (t) => {
@@ -788,6 +816,7 @@ export class Searcher {
       ).then((r) => {
         slot.settled = true;
         slot.outcome = r;
+        active.delete(controller);
         if (slot.abortedUs) this.pool.releaseNeutral(account);
         else this.pool.release(account, !!r.data, r.error?.message);
         this.onAttempt?.(account);
@@ -831,8 +860,8 @@ export class Searcher {
       return classify(o);
     }
 
-    // 主路存活但零正文：并行备路
-    const secondary = launch(false);
+    // 主路存活但零正文：并行备路（名额/预算不够就单等）
+    const secondary = canLaunch() ? launch(false) : null;
     if (!secondary) {
       const o = await primary.promise;
       return classify(o);

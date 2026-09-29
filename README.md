@@ -149,7 +149,9 @@ curl http://127.0.0.1:46328/v1/chat/completions \
 | `search.firstProgressMs` | 10000 | 哑号快速让位：限时内毫无搜索进展即换号 |
 | `search.answerMaxMs` | 120000 | grok-search 模型单路等正文硬上限 |
 | `search.answerTimeoutMs` | 25000 | grok-search 模型：有结果后正文超期不来，用搜索结果兜底 |
-| `search.hedgeDelayMs` | 10000 | grok-search 模型对冲延迟：主路超期零正文则并行备路，首个正文者胜 |
+| `search.hedgeDelayMs` | 7000 | grok-search 模型对冲延迟：主路超期零正文则并行备路，首个正文者胜 |
+| `search.requestTimeoutMs` | 28000 | grok-search 请求级软超时：到点取消在途尝试并带着已有结果返回（30 秒下游必拿到东西） |
+| `search.doomGraceMs` | 6000 | 进入第 3 波搜索仍无正文后的宽限，超时判失败换号 |
 | `quota.intervalMs` | 21600000 | 账号配额全量刷新周期（6 小时；0=只手动/顺带刷新） |
 | `quota.concurrency` | 3 | 配额刷新并发（带 120ms 限速，避免打爆上游） |
 | `dataDir` | data | 运行数据目录（`search.db` 搜索记录 + `quota.json` 配额缓存） |

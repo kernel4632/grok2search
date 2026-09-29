@@ -26,7 +26,9 @@
     "firstProgressMs": 10000,
     "maxAttempts": 12,
     "retryBudgetMs": 150000,
-    "hedgeDelayMs": 10000
+    "hedgeDelayMs": 7000,
+    "requestTimeoutMs": 28000,
+    "doomGraceMs": 6000
   },
   "cooldownMs": 60000,
   "clearanceTtlMs": 600000,
