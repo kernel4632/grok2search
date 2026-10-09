@@ -87,7 +87,7 @@ location /groksearch/ {
 | POST | `/v1/chat/completions` | OpenAI 兼容；`stream` 支持 SSE；`search_format=json` 可切结构化 |
 | POST | `/v1/responses` | Responses 兼容（基础事件流） |
 | POST | `/v1/search` | 原生结构化：`{query}` → `{queries,pages,posts}` |
-| GET | `/healthz` | 存活 + 号池概览（无认证） |
+| GET | `/healthz` | 存活探针（无认证，仅返回 `{ok:true}`，不含任何内部信息） |
 
 **两个模型**：
 

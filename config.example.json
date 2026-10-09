@@ -3,11 +3,10 @@
   "port": 8080,
   "panel": {
     "user": "admin",
-    "pass": "@grok2search",
-    "//": "面板登录（浏览器原生 Basic 弹窗）"
+    "pass": "CHANGE_ME_STRONG_PASSWORD"
   },
   "clientKeys": [
-    "change-me-client-key"
+    "CHANGE_ME_API_KEY"
   ],
   "accountsFile": "accounts.json",
   "flareSolverrUrl": "http://flaresolverr:8191/v1",

@@ -11,7 +11,7 @@
  * 页面用 Vue 响应式更新数据，只改数据不动页面状态，不会闪烁。
  */
 
-import { dirname, resolve } from "node:path";
+import { dirname, resolve, sep } from "node:path";
 import { Elysia, sse, t } from "elysia";
 import { cors } from "@elysiajs/cors";
 import { swagger } from "@elysiajs/swagger";
@@ -184,8 +184,8 @@ const app = new Elysia()
   .use(cors())
   .use(swagger({ path: "/docs", documentation: { info: { title: "grok2search", version: "2.0.0", description: "Grok 搜索网关：只取搜索结果，不做正文总结" } } }))
 
-  // ---------- 存活检查 ----------
-  .get("/healthz", () => ({ ok: true, model: PUBLIC_MODEL, accounts: pool.stats() }))
+  // ---------- 存活检查（只回 ok，不泄露号池/模型等内部信息） ----------
+  .get("/healthz", () => ({ ok: true }))
 
   // ---------- 公开搜索 API（Bearer） ----------
   .group("/v1", (group) =>
@@ -440,12 +440,16 @@ const app = new Elysia()
   .get("/", ({ headers, set }) => (basicOk(headers) ? new Response(Bun.file(`${WEB_DIR}/index.html`)) : challenge(set)))
   .get("/assets/:file", ({ headers, params, set }) => {
     if (!basicOk(headers)) return challenge(set);
-    const file = Bun.file(`${WEB_DIR}/${params.file}`);
+    // 路径规范化 + 目录白名单：阻断 ../ 穿越（nginx 只挡多级，单级 ..%2f 必须自己挡）
+    const requested = resolve(WEB_DIR, params.file);
+    if (requested !== WEB_DIR && !requested.startsWith(WEB_DIR + sep)) { set.status = 404; return "not found"; }
+    const file = Bun.file(requested);
     return file.size ? new Response(file) : (set.status = 404, "not found");
   })
 
   // ---------- 统一错误 ----------
   .onError(({ code, error, set }: any) => {
+    if (code === "NOT_FOUND") { set.status = 404; return "not found"; }
     if (code === "VALIDATION") { set.status = 400; return err("invalid_request", String(error?.message ?? "参数错误")); }
     log("error", "unhandled_error", { code, message: String(error?.message ?? error) });
     set.status = typeof set.status === "number" && set.status >= 400 ? set.status : 500;
