@@ -146,12 +146,13 @@ curl http://127.0.0.1:46328/v1/chat/completions \
 | `search.retryBudgetMs` | 150000 | 单请求重试总预算（毫秒），超时返回最后一次错误 |
 | `search.quietMs` | 4000 | 搜索静默多久算"搜完" |
 | `search.maxMs` | 18000 | 单路硬上限 |
-| `search.firstProgressMs` | 10000 | 哑号快速让位：限时内毫无搜索进展即换号 |
+| `search.firstProgressMs` | 10000 | search 模式连续无任何上游帧的判死时限（grok-search 不按此提前熔断） |
 | `search.answerMaxMs` | 120000 | grok-search 模型单路等正文硬上限 |
-| `search.answerTimeoutMs` | 25000 | grok-search 模型：有结果后正文超期不来，用搜索结果兜底 |
-| `search.hedgeDelayMs` | 7000 | grok-search 模型对冲延迟：主路超期零正文则并行备路，首个正文者胜 |
+| `search.answerTimeoutMs` | 0 | grok-search 模型有结果后等正文的兜底时限；0=关闭，交给 28 秒请求截止统一兜底 |
+| `search.raceWidth` | 3 | grok-search 同时跑几路完整深度搜索，第一路吐正文即胜（1=单路） |
+| `search.hedgeDelayMs` | 0 | 竞速路启动间隔（毫秒）；0=所有路同时起跑 |
 | `search.requestTimeoutMs` | 28000 | grok-search 请求级软超时：到点取消在途尝试并带着已有结果返回（30 秒下游必拿到东西） |
-| `search.doomGraceMs` | 6000 | 进入第 3 波搜索仍无正文后的宽限，超时判失败换号 |
+| `search.doomGraceMs` | 6000 | 已停用，仅保留配置兼容 |
 | `quota.intervalMs` | 21600000 | 账号配额全量刷新周期（6 小时；0=只手动/顺带刷新） |
 | `quota.concurrency` | 3 | 配额刷新并发（带 120ms 限速，避免打爆上游） |
 | `dataDir` | data | 运行数据目录（`search.db` 搜索记录 + `quota.json` 配额缓存） |
@@ -184,8 +185,9 @@ test/
 * **协议要点**（改动前先看 `grok.ts` 顶部注释）：WebSocket `wss://grok.com/ws/mgw/?uid=`，
   Cookie = `sso` + `sso-rw` + Cloudflare 清关 + `x-userid`；会话模型名 `fast`；
   搜索帧 `response.chunk.tool_usage_card` / `response.chunk.tool_result`；
-* **为什么不用并发竞速**：不等正文总结后，"卡死"只可能发生在搜索阶段之前，
-  概率极低；单路 + 失败换号重试即可，代码量和上游消耗都更小。
+* **并发深度搜索竞速**：grok-search 同时起 3 路完整搜索（每路都是模型自己的深度搜索），
+  第一路吐出 assistant 正文即锁定胜者，其余取消；不做“用截取的搜索列表二次总结”，
+  因为只有模型自己看到的工具结果才是完整的。竞速路数可用 `search.raceWidth` 调整。
 
 ---
 

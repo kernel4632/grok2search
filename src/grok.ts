@@ -47,6 +47,8 @@ export interface SearchData {
   posts: Post[];
   /** 首个搜索结果到达的时间（毫秒，面板"首字"指标） */
   firstResultMs?: number;
+  /** 首段模型正文到达的时间（毫秒，28 秒预算内最关键的指标） */
+  firstAnswerMs?: number;
   elapsedMs?: number;
   /** 上游搜索波次（metadata.step_id 最大值；≥2 且无正文基本等于模型空转） */
   steps?: number;
@@ -93,11 +95,13 @@ export interface SearchConfig {
   answerMaxMs?: number;
   /** grok-search 模型：搜到结果后，若正文迟迟不开始吐，就用搜索结果兜底收工（秒） */
   answerTimeoutMs?: number;
-  /** 对冲延迟（毫秒）：主路超期仍无正文时，并行再起一路；0 = 总是并行 */
+  /** 竞速路数：同时跑几路完整深度搜索，第一路吐正文者胜（1=单路，默认 3） */
+  raceWidth?: number;
+  /** 竞速启动间隔（毫秒）：0=所有路同时启动；>0 时逐路追加 */
   hedgeDelayMs?: number;
   /** 请求级软超时（毫秒）：grok-search 模式下超时则带着已有结果返回，保证下游 30 秒内有东西；<=0 关闭 */
   requestTimeoutMs?: number;
-  /** 空转熔断宽限（毫秒）：进入第 3 波搜索后仍无正文则判失败换号 */
+  /** 旧版空转熔断参数（已停用，保留配置兼容） */
   doomGraceMs?: number;
   /** grok-search 模型的引导词（让模型知道自己是搜索助手；缺省用 instruction） */
   chatInstruction?: string;
@@ -315,6 +319,7 @@ export class Pool {
 export class Clearance {
   private cache?: { cookie: string; ua: string; expiresAt: number };
   private inflight?: Promise<{ cookie: string; ua: string }>;
+  private keepAliveTimer?: ReturnType<typeof setTimeout>;
 
   constructor(
     private url: string,
@@ -323,6 +328,28 @@ export class Clearance {
 
   status() {
     return { cached: !!this.cache && this.cache.expiresAt > Date.now(), expiresAt: this.cache?.expiresAt };
+  }
+
+  /**
+   * 后台预热/续期：启动时立刻刷一次，之后在 TTL 到期前刷新。
+   * FlareSolverr 解 Cloudflare 实测要 25~35 秒；如果等请求到来才刷新，
+   * 这段耗时会把下游 30 秒预算全部吃掉。失败 60 秒后重试。
+   */
+  keepWarm() {
+    const tick = async () => {
+      try {
+        await this.get(true);
+      } catch (error: any) {
+        log("warn", "clearance_prewarm_failed", { error: String(error?.message ?? error) });
+      }
+      const remaining = (this.cache?.expiresAt ?? 0) - Date.now();
+      const delay = remaining > this.ttlMs * 0.2
+        ? Math.max(60_000, Math.min(this.ttlMs * 0.8, remaining - this.ttlMs * 0.2))
+        : 60_000;
+      this.keepAliveTimer = setTimeout(tick, delay);
+      this.keepAliveTimer.unref?.();
+    };
+    void tick();
   }
 
   async get(force = false) {
@@ -477,11 +504,11 @@ export function collectSession(account: Account, query: string, config: SearchCo
     let maxTimer: ReturnType<typeof setTimeout> | undefined;
     let firstProgressTimer: ReturnType<typeof setTimeout> | undefined;
     let answerTimer: ReturnType<typeof setTimeout> | undefined;
-    let doomTimer: ReturnType<typeof setTimeout> | undefined;
+    let connectTimer: ReturnType<typeof setTimeout> | undefined;
     let heartbeat: ReturnType<typeof setInterval> | undefined;
+    let timersStarted = false;
     let done = false;
     let settled = false;
-    let gotResult = false; // 是否已收到搜索结果（用于 answer 兜底计时）
     let maxStep = 0; // 上游搜索波次（metadata.step_id 最大值）
 
     /** 收工/失败统一出口（清资源、补耗时与上限、只结算一次） */
@@ -492,10 +519,11 @@ export function collectSession(account: Account, query: string, config: SearchCo
       clearTimeout(maxTimer);
       clearTimeout(firstProgressTimer);
       clearTimeout(answerTimer);
-      clearTimeout(doomTimer);
+      clearTimeout(connectTimer);
       clearInterval(heartbeat);
       try { ws?.close(); } catch {}
-      if (ok) {
+      // 总结模式下只要正文已经开始，就接受这半截答案：比整段换成搜索结果更有价值
+      if (ok || (waitForAnswer && (data.answer ?? "").trim())) {
         data.elapsedMs = Date.now() - startedAt;
         data.pages = data.pages.slice(0, config.maxPages);
         data.posts = data.posts.slice(0, config.maxPosts);
@@ -506,30 +534,31 @@ export function collectSession(account: Account, query: string, config: SearchCo
       }
     };
 
-    // 总结模式兜底：搜到结果后，正文若迟迟不开始吐，用搜索结果收工（避免空 content 傻等 120s）
+    // 总结模式兜底：默认关闭（answerTimeoutMs=0）。28 秒请求截止会统一兜底，
+    // 提前收工只会浪费模型还在深度搜索/写答案的时间。
     const resetAnswerTimer = () => {
-      if (!waitForAnswer || settled) return;
+      if (!waitForAnswer || settled || !config.answerTimeoutMs || config.answerTimeoutMs <= 0) return;
       clearTimeout(answerTimer);
-      answerTimer = setTimeout(() => finish(data.pages.length + data.posts.length > 0), config.answerTimeoutMs ?? 25_000);
+      answerTimer = setTimeout(() => finish(data.pages.length + data.posts.length > 0), config.answerTimeoutMs);
     };
 
-    // 总结模式空转检测：实测正常会话最多 2 波搜索且正文 4 秒即来；
-    // 一旦进入第 3 波仍无正文，上游基本已静默，宽限后判失败换号（大概率拿到完整回答）
-    const armDoomTimer = () => {
-      if (!waitForAnswer || settled || data.answer || maxStep < 2) return;
-      clearTimeout(doomTimer);
-      doomTimer = setTimeout(() => {
-        if (!settled && !data.answer) finish(false, new SessionError("模型多轮搜索无回答，换号重试"));
-      }, config.doomGraceMs ?? 6_000);
+    // 搜索模式专用：连续 firstProgressMs 没有任何上游帧才判死。
+    // 总结模式不再按“搜索波次”提前熔断，深度搜索可以一直跑到 28 秒截止。
+    const armFirstProgress = () => {
+      if (waitForAnswer || settled || !timersStarted) return;
+      clearTimeout(firstProgressTimer);
+      firstProgressTimer = setTimeout(() => finish(false, new SessionError("上游长时间没有搜索进展")), config.firstProgressMs);
     };
 
-    // 哑号快速失败：限时内没有任何搜索进展（连搜索词都没有）就直接换号
-    firstProgressTimer = setTimeout(() => finish(false, new SessionError("上游长时间没有搜索进展")), config.firstProgressMs);
+    const startSessionTimers = () => {
+      if (timersStarted || settled) return;
+      timersStarted = true;
+      clearTimeout(connectTimer);
+      armFirstProgress();
+      maxTimer = setTimeout(() => finish(data.pages.length + data.posts.length > 0, new SessionError("会话超时且无结果")), config.maxMs);
+    };
 
-    // 硬超时：有结果就带着结果返回，没结果算失败（换号重试）
-    maxTimer = setTimeout(() => finish(data.pages.length + data.posts.length > 0, new SessionError("会话超时且无结果")), config.maxMs);
-
-    // 取消信号（对冲落选/请求超时/进程退出时清理；有结果则带着结果返回，无结果算失败）
+    // 取消信号（竞速落选/请求超时/进程退出时清理；有结果或正文则带着已有内容返回）
     const onAbort = () => {
       if (data.pages.length + data.posts.length > 0 || (data.answer ?? "").trim()) finish(true);
       else finish(false, new SessionError("会话被取消"));
@@ -537,10 +566,11 @@ export function collectSession(account: Account, query: string, config: SearchCo
     if (signal.aborted) return onAbort();
     signal.addEventListener("abort", onAbort, { once: true });
 
-    // ---- 建连 ----
+    // ---- 建连（清关耗时不计入模型搜索预算） ----
     clearance
       .get()
       .then((material) => {
+        if (signal.aborted) return onAbort();
         const base = new URL(config.baseUrl);
         base.protocol = base.protocol === "http:" ? "ws:" : "wss:";
         base.pathname = "/ws/mgw/";
@@ -554,6 +584,7 @@ export function collectSession(account: Account, query: string, config: SearchCo
             Cookie: [`sso=${account.sso}`, `sso-rw=${account.sso}`, material.cookie, `x-userid=${account.uid}`].filter(Boolean).join("; "),
           },
         } as never);
+        connectTimer = setTimeout(() => finish(false, new SessionError("上游连接或会话建立超时")), 15_000);
 
         let sessionId = "";
         let created = false;
@@ -574,6 +605,7 @@ export function collectSession(account: Account, query: string, config: SearchCo
           turnSent = true;
           ws!.send(JSON.stringify({ session_id: sessionId, event: { type: "conversation.item.create", event_id: callId(), item: { type: "message", role: "user", x_grok: { client_message_id: callId(), input_chunks: [{ text: { text: `[system]\n${config.instruction}\n\n[user]\n${query}` } }] } } } }));
           ws!.send(JSON.stringify({ session_id: sessionId, event: { type: "response.create", event_id: callId() } }));
+          startSessionTimers();
         };
 
         ws.addEventListener("open", () => {
@@ -591,6 +623,7 @@ export function collectSession(account: Account, query: string, config: SearchCo
           try { envelope = JSON.parse(message.data); } catch { return; }
           const event = envelope?.event;
           if (!event?.type) return;
+          armFirstProgress(); // 搜索模式：任何上游帧都算存活，连续静默才判死
 
           // 握手状态机
           if (event.type === "session.created") { created = true; sessionId = sessionId || envelope.session_id || event.session?.id || ""; return sendTurn(); }
@@ -604,23 +637,19 @@ export function collectSession(account: Account, query: string, config: SearchCo
 
           // 搜索语义事件
           const step = event.chunk?.metadata?.step_id;
-          if (typeof step === "number" && step > maxStep) {
-            maxStep = step;
-            armDoomTimer(); // 进入新一波搜索仍无正文？大概率空转，8 秒后判失败换号
-          }
+          if (typeof step === "number" && step > maxStep) maxStep = step;
           const parsed = parseFrame(event, frameState);
           if (!parsed) return;
           if (parsed.type === "error") return finish(false, new SessionError(parsed.message));
           if (parsed.type === "text_delta") {
             data.answer = (data.answer ?? "") + parsed.text;
+            if (data.firstAnswerMs === undefined) data.firstAnswerMs = Date.now() - startedAt;
             clearTimeout(answerTimer); // 正文开始吐了，撤销兜底计时
-            clearTimeout(doomTimer); // 有正文就不是空转
             hooks?.onText?.(parsed.text);
             return;
           }
           if (parsed.type === "query") {
             if (parsed.query.trim()) { queryByCall.set(parsed.callId, parsed.query.trim()); if (!data.queries.includes(parsed.query.trim())) data.queries.push(parsed.query.trim()); }
-            clearTimeout(firstProgressTimer); // 已有搜索进展，撤销哑号计时
             return bump();
           }
           const q = queryByCall.get(parsed.callId) ?? data.queries.at(-1) ?? "";
@@ -628,9 +657,7 @@ export function collectSession(account: Account, query: string, config: SearchCo
           if (parsed.type === "posts") for (const post of parsed.posts) { if (seenPost.has(post.url)) continue; seenPost.add(post.url); const item = { ...post, query: q }; data.posts.push(item); hooks?.onSearch?.("post", item); }
           // 记录首个搜索结果的到达时间（面板"首字"指标，衡量搜索链路快慢）
           if (data.firstResultMs === undefined) data.firstResultMs = Date.now() - startedAt;
-          gotResult = true;
-          resetAnswerTimer(); // 有结果到达：重置"等正文"兜底计时
-          clearTimeout(firstProgressTimer);
+          resetAnswerTimer(); // 有结果到达：重置"等正文"兜底计时（默认关闭）
           bump();
         });
       })
@@ -668,16 +695,15 @@ export class Searcher {
   }
 
   /**
-   * grok-search 模型：搜到结果后继续等模型把总结写完（答案全文），带对冲+请求级软超时。
-   * hooks.onSearch=搜索结果增量（吐到"思考"），hooks.onText=答案文本增量（吐到正文）。
+   * grok-search 模型：每一路都跑完整深度搜索，多路同时竞速；
+   * **第一路吐出 assistant 正文即获胜**，其余立即取消（不计失败）。
    *
-   * 对冲策略（staggered hedging）：主路启动 hedgeDelayMs 后若仍无正文，
-   * 并行再起一路（不同号）；首个带正文结束者获胜，输家取消（不计失败）。
-   * 搜索结果跨路去重共享，下游拿到的是两路结果的并集，正文只取胜者。
-   * 思考去重：话筒只给第一路"有结果"的尝试，第一轮结果下发后锁死，
-   * 换号/对冲不再往思考里塞，只等正文；第一路零结果则转交仍在跑的尝试。
-   * 软超时（requestTimeoutMs，默认 28 秒）：到点取消在 flight 的尝试并带着已有
-   * 结果返回，保证 30 秒限制的下游必定拿到东西（正文率靠对冲+重试顶上去）。
+   * 关键点：
+   *   - 不做“浅搜一下就让模型总结”，每一路都是模型自己的完整搜索+回答；
+   *   - 以“首正文”而不是“整段答完”为胜出条件，确保 28 秒内下游能看到字；
+   *   - 思考话筒只给第一路有结果的尝试，避免多路搜索把 reasoning 灌爆；
+   *   - 软超时（requestTimeoutMs，默认 28 秒）：到点取消所有在途尝试，
+   *     有正文就返回正文，没有就用已收集的搜索结果兜底。
    */
   async chat(query: string, caller: string, hooks?: { onSearch?: (chunk: string) => void; onText?: (text: string) => void }): Promise<SearchData & { answer?: string }> {
     const config: SearchConfig = { ...this.config, waitForAnswer: true, maxMs: this.config.answerMaxMs ?? 120_000, instruction: this.config.chatInstruction ?? this.config.instruction };
@@ -689,7 +715,7 @@ export class Searcher {
     let lastError: Error | undefined;
     let fallback: (SearchData & { answer?: string }) | undefined;
 
-    // 跨路共享的搜索去重下发（两路结果并集都吐给下游）
+    // 跨路共享的搜索去重下发（竞速中任何一路的新结果都吐给下游）
     const emitSearch = hooks?.onSearch
       ? (kind: "page" | "post", item: Page | Post) => {
           if (streamed.has(item.url)) return;
@@ -700,13 +726,10 @@ export class Searcher {
 
     const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-    // 思考话筒：只给第一路"有结果"的尝试。第一轮结果完整下发后锁死，
-    // 换号/对冲不再往思考里塞东西，只等正文（避免思考被多路结果灌水）。
-    // 若第一路零结果收场，话筒转交给仍在跑的尝试（或下一轮首路认领）。
+    // 思考话筒：只给第一路"有结果"的尝试。持筒者零结果收场时转交仍在跑的尝试。
     const searchGate: { uid: string | null } = { uid: null };
 
-    // 请求级软超时：到点取消所有在 flight 的尝试，带着已有结果返回。
-    // 保证下游（30 秒限制的 MCP/搜索工具）在 30 秒内必定拿到东西，正文率靠对冲+重试顶上去。
+    // 请求级软超时：到点取消所有在 flight 的尝试，带着已有正文/结果返回。
     const requestMs = config.requestTimeoutMs ?? 28_000;
     let deadlineFired = false;
     const active = new Map<AbortController, () => void>();
@@ -725,11 +748,12 @@ export class Searcher {
             { caller, query, accountId: round.accountId ?? "hedged", pages: data.pages.length, posts: data.posts.length, firstResultMs: data.firstResultMs, elapsedMs: data.elapsedMs ?? Date.now() - startedAt, ok: true },
             { text: toText(data, query, config.snippetMaxChars), json: toJSON(data) },
           );
-          log("info", "search", { logId: entry.id, caller, query, accountId: round.accountId ?? "hedged", attempts, hedged: round.hedged, pages: data.pages.length, posts: data.posts.length, steps: data.steps, hasAnswer: true, firstResultMs: data.firstResultMs, elapsedMs: Date.now() - startedAt, ok: true });
+          log("info", "search", { logId: entry.id, caller, query, accountId: round.accountId ?? "hedged", attempts, hedged: round.hedged, pages: data.pages.length, posts: data.posts.length, steps: data.steps, hasAnswer: true, firstResultMs: data.firstResultMs, firstAnswerMs: data.firstAnswerMs, elapsedMs: Date.now() - startedAt, ok: true });
           return data;
         }
         if (round.fallback) fallback = fallback ? this.mergeChatData([fallback, round.fallback], fallback) : round.fallback;
         if (round.error) lastError = round.error;
+        if (round.error instanceof NoAccountError && !round.fallback) throw round.error;
         if (round.waited) { await sleep(1000); continue; }
         if (round.exhausted) break;
         // 本轮无胜者：继续下一轮（换号重试）
@@ -744,7 +768,7 @@ export class Searcher {
         { caller, query, pages: fallback.pages.length, posts: fallback.posts.length, firstResultMs: fallback.firstResultMs, elapsedMs: Date.now() - startedAt, ok: true },
         { text: toText(fallback, query, config.snippetMaxChars), json: toJSON(fallback) },
       );
-      log("info", "search", { logId: entry.id, caller, query, attempts, pages: fallback.pages.length, posts: fallback.posts.length, hasAnswer: false, elapsedMs: Date.now() - startedAt, ok: true, note: "answer-fallback" });
+      log("info", "search", { logId: entry.id, caller, query, attempts, pages: fallback.pages.length, posts: fallback.posts.length, steps: fallback.steps, hasAnswer: false, firstAnswerMs: fallback.firstAnswerMs, elapsedMs: Date.now() - startedAt, ok: true, note: "answer-fallback" });
       return fallback;
     }
     const reason = lastError ?? new Error("搜索失败");
@@ -766,6 +790,8 @@ export class Searcher {
     }
     const firsts = all.map((d) => d.firstResultMs).filter((v): v is number => typeof v === "number");
     if (firsts.length) merged.firstResultMs = Math.min(...firsts);
+    const firstAnswers = all.map((d) => d.firstAnswerMs).filter((v): v is number => typeof v === "number");
+    if (firstAnswers.length) merged.firstAnswerMs = Math.min(...firstAnswers);
     const elaps = all.map((d) => d.elapsedMs).filter((v): v is number => typeof v === "number");
     if (elaps.length) merged.elapsedMs = Math.max(...elaps);
     const steps = all.map((d) => d.steps).filter((v): v is number => typeof v === "number");
@@ -773,9 +799,10 @@ export class Searcher {
     return merged;
   }
 
-    /**
-   * 一轮对冲：主路先跑，超期无正文则并行备路；首个带正文结束者获胜。
-   * 返回 winner（带正文）/ fallback（无正文但有搜索结果）/ error / waited / exhausted。
+  /**
+   * 一轮竞速：同时启动 raceWidth 路完整深度搜索。
+   * 第一路吐出非空 assistant 正文即胜，其余立即取消（不计失败）；
+   * 若所有路都没正文，则返回合并后的搜索结果兜底。
    */
   private async hedgedRound(
     query: string,
@@ -788,7 +815,8 @@ export class Searcher {
     canLaunch: () => boolean,
     searchGate: { uid: string | null },
   ): Promise<{ winner?: SearchData & { answer?: string }; accountId?: string; fallback?: SearchData & { answer?: string }; error?: Error; waited?: boolean; exhausted?: boolean; hedged?: boolean }> {
-    const hedgeMs = config.hedgeDelayMs ?? 10_000;
+    const width = Math.max(1, Math.min(config.raceWidth ?? 3, 5));
+    const stagger = Math.max(0, config.hedgeDelayMs ?? 0);
 
     interface Slot {
       account: Account;
@@ -796,11 +824,21 @@ export class Searcher {
       isPrimary: boolean;
       settled: boolean;
       abortedUs: boolean;
-      answerBytes: number;
-      outcome?: { account: Account; data?: SearchData & { answer?: string }; error?: Error };
-      promise: Promise<{ account: Account; data?: SearchData & { answer?: string }; error?: Error }>;
+      answerText: string;
+      streamed: boolean;
+      outcome?: AttemptOutcome;
+      promise: Promise<AttemptOutcome>;
     }
     const slots: Slot[] = [];
+    let winner: Slot | undefined;
+
+    const abortLosers = (keep: Slot) => {
+      for (const slot of slots) {
+        if (slot === keep || slot.settled) continue;
+        slot.abortedUs = true;
+        try { slot.controller.abort(); } catch {}
+      }
+    };
 
     const launch = (isPrimary: boolean): Slot | null => {
       const account = this.pool.acquireExcept(tried);
@@ -808,48 +846,52 @@ export class Searcher {
       tried.add(account.uid);
       countAttempt();
       const controller = new AbortController();
-      const slot: Slot = { account, controller, isPrimary, settled: false, abortedUs: false, answerBytes: 0, promise: null as any };
+      const slot: Slot = { account, controller, isPrimary, settled: false, abortedUs: false, answerText: "", streamed: false, promise: null as any };
       // 认领思考话筒：只有第一路（gate 为空时）能往思考里吐结果
       if (!searchGate.uid) searchGate.uid = account.uid;
-      // 注册到在 flight 表：超时熔断时可从外部取消
+      // 注册到在 flight 表：请求超时可从外部取消
       active.set(controller, () => { if (!slot.settled) { slot.abortedUs = true; try { controller.abort(); } catch {} } });
       slot.promise = collectSession(account, query, config, this.clearance, () => crypto.randomUUID(), controller.signal, {
         onSearch: emitSearch ? (kind, item) => {
           if (searchGate.uid !== account.uid) return; // 话筒不在这路：只收集不下发
           emitSearch(kind, item);
         } : undefined,
-        onText: (t) => {
-          if (!slot.isPrimary) return; // 备路正文不直播，获胜后整体下发
-          slot.answerBytes += t.length;
-          onTextLive?.(t);
+        onText: (text) => {
+          slot.answerText += text;
+          // 首个非空正文出现即锁定胜者，其他路立刻取消
+          if (!winner && text.trim()) {
+            winner = slot;
+            abortLosers(slot);
+          }
+          if (winner !== slot) return;
+          // 胜者正文直播：主路通常已经边到边发；备路获胜则一次性补发已积累的全文
+          if (!slot.streamed) {
+            onTextLive?.(slot.answerText);
+            slot.streamed = true;
+          } else {
+            onTextLive?.(text);
+          }
         },
       }).then(
         (data): AttemptOutcome => ({ account, data }),
         (error): AttemptOutcome => ({ account, error: error instanceof Error ? error : new Error(String(error)) }),
-      ).then((r) => {
+      ).then((outcome) => {
         slot.settled = true;
-        slot.outcome = r;
+        slot.outcome = outcome;
         active.delete(controller);
         if (slot.abortedUs) this.pool.releaseNeutral(account);
-        else this.pool.release(account, !!r.data, r.error?.message);
+        else this.pool.release(account, !!outcome.data, outcome.error?.message);
         this.onAttempt?.(account);
-        // 话筒交接：持筒者零结果收场，把话筒转给仍在跑的尝试（或下一轮首路认领）
-        if (searchGate.uid === account.uid && !(r.data && (r.data.pages.length + r.data.posts.length > 0))) {
+        // 话筒交接：持筒者零结果收场，把话筒转给仍在跑的尝试
+        if (searchGate.uid === account.uid && !(outcome.data && (outcome.data.pages.length + outcome.data.posts.length > 0))) {
           searchGate.uid = null;
-          const running = slots.find((s) => !s.settled);
+          const running = slots.find((item) => !item.settled);
           if (running) searchGate.uid = running.account.uid;
         }
-        return r;
+        return outcome;
       });
       slots.push(slot);
       return slot;
-    };
-
-    // 单路结算归类：带正文=胜，无正文但有结果=兜底，否则=失败
-    const classify = (o: { account: Account; data?: SearchData & { answer?: string }; error?: Error }) => {
-      if (o.data?.answer?.trim()) return { winner: o.data, accountId: o.account.id };
-      if (o.data) return { fallback: o.data };
-      return { error: o.error ?? new Error("搜索失败") };
     };
 
     const primary = launch(true);
@@ -860,56 +902,36 @@ export class Searcher {
       return { waited: true };
     }
 
-    // 等主路结束，或对冲时间到
-    const hedgeDue = await new Promise<boolean>((resolve) => {
-      const timer = setTimeout(() => resolve(true), Math.max(0, hedgeMs));
-      primary.promise.then(() => { clearTimeout(timer); resolve(false); });
-    });
-    if (!hedgeDue && primary.outcome) {
-      // 主路在对冲前已结束
-      return classify(primary.outcome);
-    }
-    if (!hedgeDue || primary.settled) {
-      const o = await primary.promise;
-      return classify(o);
-    }
-    if (primary.answerBytes > 0) {
-      // 主路正在吐正文（只是慢）：不等备路，直接等它结束
-      const o = await primary.promise;
-      return classify(o);
+    // 追加竞速路：默认同时起跑；hedgeDelayMs>0 时逐路追加
+    for (let index = 1; index < width; index++) {
+      if (stagger > 0) {
+        if (winner || !canLaunch()) break;
+        await new Promise((resolve) => setTimeout(resolve, stagger));
+      }
+      if (winner || !canLaunch()) break;
+      if (!launch(false)) break;
     }
 
-    // 主路存活但零正文：并行备路（名额/预算不够就单等）
-    const secondary = canLaunch() ? launch(false) : null;
-    if (!secondary) {
-      const o = await primary.promise;
-      return classify(o);
-    }
-
-    // 双路并行：首个带正文结束者获胜，另一路取消
-    let winnerSlot: Slot | undefined;
-    const watch = (slot: Slot) => slot.promise.then((o) => {
-      if (!winnerSlot && o.data?.answer?.trim()) {
-        winnerSlot = slot;
-        for (const s of slots) {
-          if (s !== slot && !s.settled) { s.abortedUs = true; try { s.controller.abort(); } catch {} }
+    // 第一路正文出现后等它结束；没有正文则等所有路结束
+    while (true) {
+      if (winner) {
+        const outcome = await winner.promise;
+        if (outcome.data?.answer?.trim()) {
+          if (!winner.streamed && onTextLive && outcome.data.answer) onTextLive(outcome.data.answer);
+          return { winner: outcome.data, accountId: winner.account.id, hedged: slots.length > 1 };
         }
       }
-      return o;
-    });
-    const outcomes = await Promise.all([watch(primary), watch(secondary)]);
-    const datas = outcomes.map((o) => o.data).filter((d): d is SearchData & { answer?: string } => !!d);
-    if (winnerSlot?.outcome?.data) {
-      const data = winnerSlot.outcome.data;
-      // 备路获胜且主路零字节：把备路全文补进直播流（不会 garble）
-      if (!winnerSlot.isPrimary && primary.answerBytes === 0 && data.answer) onTextLive?.(data.answer);
-      return { winner: this.mergeChatData(datas, data), accountId: winnerSlot.account.id, hedged: true };
+      const pending = slots.filter((slot) => !slot.settled);
+      if (pending.length === 0) break;
+      await Promise.race(pending.map((slot) => slot.promise));
     }
+
+    const outcomes = slots.map((slot) => slot.outcome).filter((outcome): outcome is AttemptOutcome => !!outcome);
+    const datas = outcomes.map((outcome) => outcome.data).filter((data): data is SearchData & { answer?: string } => !!data);
     if (datas.length) {
-      const merged = this.mergeChatData(datas, datas[0]!);
-      return { fallback: merged, error: outcomes.map((o) => o.error).find(Boolean) };
+      return { fallback: this.mergeChatData(datas, datas[0]!), error: outcomes.map((outcome) => outcome.error).find(Boolean), hedged: slots.length > 1 };
     }
-    return { error: outcomes.map((o) => o.error).find(Boolean) ?? new Error("搜索失败"), hedged: true };
+    return { error: outcomes.map((outcome) => outcome.error).find(Boolean) ?? new Error("搜索失败"), hedged: slots.length > 1 };
   }
 
   /** 共用的换号重试循环（waitForAnswer 由 config 决定；返回带 answer 的结果） */
@@ -957,7 +979,7 @@ export class Searcher {
           { caller, query, accountId: account.id, pages: data.pages.length, posts: data.posts.length, firstResultMs: data.firstResultMs, elapsedMs: data.elapsedMs ?? Date.now() - startedAt, ok: true },
           { text: toText(data, query, config.snippetMaxChars), json: toJSON(data) },
         );
-        log("info", "search", { logId: entry.id, caller, query, accountId: account.id, attempts: tried.size, pages: data.pages.length, posts: data.posts.length, steps: data.steps, hasAnswer: !!data.answer, firstResultMs: data.firstResultMs, elapsedMs: Date.now() - startedAt, ok: true });
+        log("info", "search", { logId: entry.id, caller, query, accountId: account.id, attempts: tried.size, pages: data.pages.length, posts: data.posts.length, steps: data.steps, hasAnswer: !!data.answer, firstResultMs: data.firstResultMs, firstAnswerMs: data.firstAnswerMs, elapsedMs: Date.now() - startedAt, ok: true });
         return data;
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));

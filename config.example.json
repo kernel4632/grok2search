@@ -25,7 +25,8 @@
     "firstProgressMs": 10000,
     "maxAttempts": 12,
     "retryBudgetMs": 150000,
-    "hedgeDelayMs": 7000,
+    "raceWidth": 3,
+    "hedgeDelayMs": 0,
     "requestTimeoutMs": 28000,
     "doomGraceMs": 6000
   },

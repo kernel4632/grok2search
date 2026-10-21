@@ -61,8 +61,11 @@ const searchConfig: SearchConfig = {
   maxPages: userConfig.search?.maxPages ?? 40,
   maxPosts: userConfig.search?.maxPosts ?? 20,
   answerMaxMs: userConfig.search?.answerMaxMs ?? 120_000,
-  answerTimeoutMs: userConfig.search?.answerTimeoutMs ?? 25_000,
-  hedgeDelayMs: userConfig.search?.hedgeDelayMs ?? 7_000,
+  // 0 = 关闭提前收工：让模型跑到 28 秒请求截止，正文一出现就锁定胜者
+  answerTimeoutMs: userConfig.search?.answerTimeoutMs ?? 0,
+  // 竞速：默认 3 路完整深度搜索同时起跑，第一路吐正文即胜
+  raceWidth: userConfig.search?.raceWidth ?? 3,
+  hedgeDelayMs: userConfig.search?.hedgeDelayMs ?? 0,
   requestTimeoutMs: userConfig.search?.requestTimeoutMs ?? 28_000,
   doomGraceMs: userConfig.search?.doomGraceMs ?? 6_000,
   chatInstruction: userConfig.search?.chatInstruction ?? SEARCH_INSTRUCTION,
@@ -85,17 +88,18 @@ const quotaStore = new QuotaStore(resolve(config.dataDir, "quota.json"));
 const pool = new Pool(config.accountsFile, config.cooldownMs, quotaStore);
 pool.load();
 const clearance = new Clearance(config.flareSolverrUrl, config.clearanceTtlMs);
+clearance.keepWarm();
 // 配额刷新器：启动后全量刷一次 + 周期刷新；每次搜索结束后顺带刷新当次用到的号
 const quota = new QuotaRefresher(quotaStore, clearance, () => pool.credentials(), { baseUrl: config.upstream.baseUrl, ...config.quota });
 quota.start();
 const searcher = new Searcher(pool, clearance, searchConfig, (account) => quota.touch(account));
 if (config.clientKeys.length === 0) log("warn", "client_keys_empty", { hint: "config.json 的 clientKeys 为空，/v1/* 将全部返回 401" });
 if (!config.panel.pass) log("warn", "panel_password_empty", { hint: "config.json 的 panel.pass 为空，面板将无法登录" });
-log("info", "started", { port: config.port, accounts: pool.stats().total, quietMs: searchConfig.quietMs, maxAttempts: searchConfig.maxAttempts, retryBudgetMs: searchConfig.retryBudgetMs, quotaRefreshMs: config.quota.intervalMs });
+log("info", "started", { port: config.port, accounts: pool.stats().total, quietMs: searchConfig.quietMs, maxAttempts: searchConfig.maxAttempts, retryBudgetMs: searchConfig.retryBudgetMs, raceWidth: searchConfig.raceWidth, requestTimeoutMs: searchConfig.requestTimeoutMs, quotaRefreshMs: config.quota.intervalMs });
 
 const WEB_DIR = resolve(import.meta.dir, "../web");
 const snapshot = () => ({
-  status: { uptimeSec: Math.floor(process.uptime()), accounts: pool.stats(), clearance: clearance.status(), quota: quota.status(), storage: dbStats(), search: { quietMs: searchConfig.quietMs, maxMs: searchConfig.maxMs, maxAttempts: searchConfig.maxAttempts, retryBudgetMs: searchConfig.retryBudgetMs }, model: PUBLIC_MODEL },
+  status: { uptimeSec: Math.floor(process.uptime()), accounts: pool.stats(), clearance: clearance.status(), quota: quota.status(), storage: dbStats(), search: { quietMs: searchConfig.quietMs, maxMs: searchConfig.maxMs, maxAttempts: searchConfig.maxAttempts, retryBudgetMs: searchConfig.retryBudgetMs, raceWidth: searchConfig.raceWidth, requestTimeoutMs: searchConfig.requestTimeoutMs }, model: PUBLIC_MODEL },
   accounts: pool.list(),
   // SSE 只推最新 20 条；历史用 /admin/logs 分页拉取（面板滚动加载）
   logs: getLogs(undefined, 20),
